@@ -1,0 +1,30 @@
+output_dir: ./output
+temp_dir: ./temp
+
+whisper:
+  model: small
+  workers: 4
+  language: auto
+  device: auto  # auto, cpu, cuda
+  compute_type: int8  # int8, float16, float32
+
+summary:
+  enabled: true
+  provider: claude  # claude, openai
+  model: claude-3-5-sonnet-20241022
+  max_tokens: 4096
+  temperature: 0.3
+
+download:
+  quality: best
+  format: mp4
+  cookies_from_browser: null  # chrome, firefox, edge, safari
+  subtitles_langs:
+    - zh
+    - en
+  write_subtitles: true
+  write_auto_subs: true
+
+api_keys:
+  claude: null  # 设置你的 Claude API Key
+  openai: null  # 或者 OpenAI API Key
