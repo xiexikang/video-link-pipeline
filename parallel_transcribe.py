@@ -30,6 +30,53 @@ def get_device_and_compute_type(config: dict) -> Tuple[str, str]:
     return device, compute_type
 
 
+import shutil
+
+def setup_ffmpeg():
+    """Ensure ffmpeg is in PATH"""
+    # 1. 尝试直接检测
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        print(f"✅ 检测到系统 FFmpeg: {system_ffmpeg}")
+        return
+
+    # 2. 特殊处理：检测已知的中文路径（修复环境变量乱码问题）
+    # 用户环境可能因为路径包含中文导致 PATH 解析失败
+    known_paths = [
+        r"G:\技术软件\ffmpeg-master-latest-win64-gpl-shared\bin"
+    ]
+    for p in known_paths:
+        if os.path.exists(p) and (Path(p) / "ffmpeg.exe").exists():
+            print(f"🔄 检测到中文路径 FFmpeg，正在修复环境变量: {p}")
+            os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
+            # 再次确认
+            if shutil.which("ffmpeg"):
+                print(f"✅ 系统 FFmpeg 已生效: {shutil.which('ffmpeg')}")
+                return
+
+    print("⚠️ 未检测到系统 FFmpeg，正在配置内置环境...")
+    try:
+        import imageio_ffmpeg as i_ffmpeg
+        src_ffmpeg = i_ffmpeg.get_ffmpeg_exe()
+        
+        # Create local bin directory
+        bin_dir = Path("./bin").resolve()
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        
+        dest_ffmpeg = bin_dir / "ffmpeg.exe"
+        
+        # Copy if not exists or different size
+        if not dest_ffmpeg.exists() or dest_ffmpeg.stat().st_size != Path(src_ffmpeg).stat().st_size:
+            print(f"复制 ffmpeg 到本地 bin 目录: {dest_ffmpeg}")
+            shutil.copy2(src_ffmpeg, dest_ffmpeg)
+            
+        # Add to PATH
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+        print(f"已将 ffmpeg 添加到 PATH: {bin_dir}")
+        
+    except Exception as e:
+        print(f"配置 ffmpeg 失败: {e}")
+
 def transcribe_audio(
     input_path: str,
     output_dir: str,
@@ -40,7 +87,7 @@ def transcribe_audio(
 ) -> dict:
     """
     使用 faster-whisper 转录音频
-
+    
     Args:
         input_path: 音频或视频文件路径
         output_dir: 输出目录
@@ -48,10 +95,12 @@ def transcribe_audio(
         language: 语言代码 (auto 为自动检测)
         device: 计算设备 (cpu, cuda, auto)
         compute_type: 计算类型 (int8, float16, float32)
-
+    
     Returns:
         dict: 转录结果
     """
+    setup_ffmpeg()
+    
     input_path = Path(input_path)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -101,10 +150,18 @@ def transcribe_audio(
                 print("错误: 无法加载 faster-whisper，且未安装 openai-whisper")
                 print("运行: pip install openai-whisper")
                 return result
+            
             print(f"加载 OpenAI Whisper 模型: {model_size}")
             model = whisper.load_model(model_size)
+            
+            # 检测设备并设置 FP16
+            fp16 = True
+            if model.device.type == "cpu":
+                fp16 = False
+                print("检测到 CPU 运行，已禁用 FP16 以避免警告")
+                
             print(f"开始转录: {input_path}")
-            wres = model.transcribe(str(input_path), language=None if language == "auto" else language)
+            wres = model.transcribe(str(input_path), language=None if language == "auto" else language, fp16=fp16)
             detected_language = wres.get("language")
             for s in wres.get("segments", []):
                 segments_list.append({
@@ -197,32 +254,36 @@ def format_time_vtt(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
 
 
-def extract_audio_from_video(video_path: str, temp_dir: str = "./temp") -> Optional[str]:
+def extract_audio_from_video(video_path: str, output_dir: str) -> Optional[str]:
     """从视频文件提取音频"""
     try:
-        import ffmpeg
+        import subprocess
         try:
             import imageio_ffmpeg as i_ffmpeg
-            os.environ.setdefault("FFMPEG_BINARY", i_ffmpeg.get_ffmpeg_exe())
+            ffmpeg_exe = i_ffmpeg.get_ffmpeg_exe()
         except Exception:
-            pass
+            ffmpeg_exe = "ffmpeg"
 
         video_path = Path(video_path)
-        temp_dir = Path(temp_dir)
-        temp_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        audio_path = temp_dir / f"{video_path.stem}.mp3"
+        audio_path = output_dir / f"{video_path.stem}.mp3"
 
         if audio_path.exists():
             return str(audio_path)
 
-        print(f"从视频中提取音频...")
-        process = (
-            ffmpeg.input(str(video_path))
-            .output(str(audio_path), vn=True, acodec="libmp3lame", q="2")
-            .overwrite_output()
-        )
-        process.run(quiet=True)
+        print(f"从视频中提取音频到: {audio_path}")
+        cmd = [
+            ffmpeg_exe,
+            "-i", str(video_path),
+            "-vn",
+            "-acodec", "libmp3lame",
+            "-q:a", "2",
+            str(audio_path),
+            "-y",
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
         return str(audio_path) if audio_path.exists() else None
 
@@ -280,15 +341,39 @@ def main():
     if args.output_dir:
         output_dir = args.output_dir
     else:
-        output_dir = input_path.parent
+        output_dir = input_path.parent if input_path.is_file() else input_path
 
     # 检查输入文件类型
     audio_extensions = {".mp3", ".wav", "flac", ".m4a", ".aac", ".ogg", ".wma"}
     video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".webm"}
 
+    # 如果输入是目录，尝试寻找视频或音频文件
+    if input_path.is_dir():
+        found_file = None
+        # 优先找视频
+        for ext in video_extensions:
+            files = list(input_path.glob(f"*{ext}"))
+            if files:
+                found_file = files[0]
+                break
+        # 没找到视频找音频
+        if not found_file:
+            for ext in audio_extensions:
+                files = list(input_path.glob(f"*{ext}"))
+                if files:
+                    found_file = files[0]
+                    break
+        
+        if found_file:
+            print(f"📂 输入是目录，自动选择文件: {found_file.name}")
+            input_path = found_file
+        else:
+            print(f"❌ 目录中未找到支持的音视频文件: {input_path}")
+            sys.exit(1)
+
     if input_path.suffix.lower() in video_extensions:
         print(f"检测到视频文件，正在提取音频...")
-        audio_path = extract_audio_from_video(str(input_path))
+        audio_path = extract_audio_from_video(str(input_path), str(output_dir))
         if not audio_path:
             print("❌ 音频提取失败")
             sys.exit(1)

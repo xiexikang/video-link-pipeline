@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -41,6 +42,76 @@ def find_ffmpeg() -> Optional[str]:
         return i_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return None
+
+
+def try_selenium_extract(url: str) -> Tuple[Optional[str], Optional[str], Optional[List]]:
+    """
+    尝试使用 Selenium 获取视频真实地址
+    返回: (video_url, title, cookies)
+    """
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
+        from webdriver_manager.chrome import ChromeDriverManager
+    except ImportError:
+        print("⚠️  未安装 Selenium 相关依赖，无法自动尝试 Selenium 提取。")
+        print("   请运行: pip install selenium webdriver_manager")
+        return None, None, None
+
+    print(f"\n🔄 尝试使用 Selenium 模拟浏览器访问: {url}")
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # 无头模式
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
+    driver = None
+    try:
+        # 初始化浏览器
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        driver.get(url)
+        time.sleep(5)  # 等待页面加载和重定向
+        
+        # 尝试获取视频元素
+        video_elements = driver.find_elements("tag name", "video")
+        
+        video_src = None
+        for video in video_elements:
+            src = video.get_attribute("src")
+            if src and "blob" not in src:
+                video_src = src
+                break
+            
+            # 尝试查找 source 标签
+            sources = video.find_elements("tag name", "source")
+            for source in sources:
+                src = source.get_attribute("src")
+                if src:
+                    video_src = src
+                    break
+            if video_src:
+                break
+        
+        title = driver.title
+        # 清理标题
+        title = sanitize_filename(title)
+        
+        if video_src:
+            print(f"✅ Selenium 成功获取视频地址!")
+            return video_src, title, None
+        else:
+            print("⚠️ Selenium 未能直接获取视频地址，尝试提取 Cookies...")
+            cookies = driver.get_cookies()
+            return None, title, cookies
+
+    except Exception as e:
+        print(f"❌ Selenium 尝试失败: {e}")
+        return None, None, None
+    finally:
+        if driver:
+            driver.quit()
 
 
 def download_video(
@@ -93,7 +164,18 @@ def download_video(
         ydl_opts.pop("merge_output_format", None)
 
     if cookies_from_browser:
-        ydl_opts["cookiesfrombrowser"] = (cookies_from_browser,)
+        # 检查是否为已知浏览器名称
+        known_browsers = ["chrome", "firefox", "edge", "safari", "opera", "brave", "vivaldi"]
+        if cookies_from_browser.lower() in known_browsers:
+            ydl_opts["cookiesfrombrowser"] = (cookies_from_browser,)
+        else:
+            # 假设是文件路径
+            if os.path.exists(cookies_from_browser):
+                ydl_opts["cookiefile"] = cookies_from_browser
+            else:
+                print(f"⚠️ 警告: 未找到 Cookies 文件或未知的浏览器名称: {cookies_from_browser}")
+                # 尝试作为浏览器名称传递，以防 yt-dlp 支持更多浏览器
+                ydl_opts["cookiesfrombrowser"] = (cookies_from_browser,)
 
     result = {
         "folder": None,
@@ -153,7 +235,70 @@ def download_video(
         result["success"] = True
 
     except Exception as e:
-        result["error"] = str(e)
+        error_msg = str(e)
+        
+        # 检查是否为抖音链接且可能是反爬虫问题
+        is_douyin = "douyin.com" in url or "tiktok.com" in url
+        is_crawler_issue = "cookies" in error_msg.lower() or "verify" in error_msg.lower() or "403" in error_msg or "json" in error_msg.lower()
+        
+        if is_douyin and is_crawler_issue:
+            print(f"\n⚠️ 检测到可能的反爬虫限制: {error_msg.splitlines()[0]}")
+            print("🔄 正在切换到 Selenium 模式重试...")
+            
+            sel_url, sel_title, sel_cookies = try_selenium_extract(url)
+            
+            if sel_url:
+                # 使用获取到的直链下载
+                try:
+                    # 更新下载选项
+                    ydl_opts_retry = dict(ydl_opts)
+                    # 必须指定文件名，因为直链通常没有元数据
+                    if sel_title:
+                        title = sel_title
+                    else:
+                        title = f"video_{int(time.time())}"
+                        
+                    dst_folder = output_path / title
+                    dst_folder.mkdir(parents=True, exist_ok=True)
+                    
+                    ydl_opts_retry["outtmpl"] = {
+                        "default": str(dst_folder / f"{title}.%(ext)s"),
+                    }
+                    # 直链通常不需要 cookies，但可能需要 headers，yt-dlp 会自动处理基础的
+                    # 禁用证书检查，以防直链 HTTPS 问题
+                    ydl_opts_retry["nocheckcertificate"] = True
+                    
+                    # 设置与 Selenium 一致的 User-Agent，并清空 Referer 以防防盗链
+                    ydl_opts_retry["http_headers"] = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Referer": "https://www.douyin.com/",
+                    }
+                    
+                    print(f"🚀 开始下载直链视频: {sel_title}")
+                    with YoutubeDL(ydl_opts_retry) as ydl:
+                        ydl.download([sel_url])
+                    
+                    # 填充成功结果
+                    standardize_and_move_files(dst_folder, dst_folder)
+                    result["folder"] = str(dst_folder)
+                    result["title"] = title
+                    result["video"] = str((dst_folder / "video.mp4").relative_to(output_path)) if (dst_folder / "video.mp4").exists() else None
+                    result["success"] = True
+                    result["error"] = None
+                    return result
+                    
+                except Exception as retry_e:
+                    print(f"❌ Selenium 辅助下载也失败了: {retry_e}")
+                    error_msg += f"\n\n[Selenium 尝试失败]: {retry_e}"
+
+            elif sel_cookies:
+                # TODO: 使用提取的 Cookies 重试 (暂时仅提示用户)
+                # 因为 yt-dlp 接受 cookiefile 或 browser，传递 dict 比较麻烦，需要转 cookiejar
+                pass
+
+        if "cookies" in error_msg.lower() and "needed" in error_msg.lower():
+            error_msg += "\n\n💡 提示: 该网站可能需要 Cookies 才能访问。\n   请尝试添加 --cookies chrome (或 edge/firefox) 参数重试。\n   例如: python download_video.py ... --cookies chrome"
+        result["error"] = error_msg
         result["success"] = False
 
     return result
@@ -254,8 +399,7 @@ def main():
     parser.add_argument(
         "--cookies",
         "-c",
-        choices=["chrome", "firefox", "edge", "safari"],
-        help="从浏览器获取cookies",
+        help="从浏览器获取cookies (如 chrome, edge) 或 cookies.txt 文件路径",
     )
     parser.add_argument(
         "--audio-only", "-a", action="store_true", help="仅下载音频"
