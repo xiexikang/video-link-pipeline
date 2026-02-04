@@ -483,6 +483,7 @@ def download_video(
     quality: str = "best",
     cookies_from_browser: Optional[str] = None,
     write_info: bool = True,
+    audio_only: bool = False,
 ) -> Dict:
     """
     下载视频、音频和字幕
@@ -493,6 +494,7 @@ def download_video(
         languages: 字幕语言列表
         quality: 视频质量
         cookies_from_browser: 从浏览器获取cookies
+        audio_only: 仅下载音频
 
     Returns:
         dict: 下载结果信息
@@ -504,20 +506,38 @@ def download_video(
     output_path.mkdir(parents=True, exist_ok=True)
 
     ffmpeg_path = find_ffmpeg()
-    ydl_opts = {
-        "format": f"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "merge_output_format": "mp4",
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "subtitleslangs": languages,
-        "subtitlesformat": "vtt/srt",
-        "writeinfojson": write_info,
-        "outtmpl": {
-            "default": str(output_path / "%(title)s" / "%(title)s.%(ext)s"),
-        },
-        "quiet": False,
-        "no_warnings": False,
-    }
+    
+    if audio_only:
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "writesubtitles": False, # 音频通常不需要字幕，或者视需求而定
+            "writeinfojson": write_info,
+            "outtmpl": {
+                "default": str(output_path / "%(title)s" / "%(title)s.%(ext)s"),
+            },
+            "quiet": False,
+            "no_warnings": False,
+        }
+    else:
+        ydl_opts = {
+            "format": f"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": languages,
+            "subtitlesformat": "vtt/srt",
+            "writeinfojson": write_info,
+            "outtmpl": {
+                "default": str(output_path / "%(title)s" / "%(title)s.%(ext)s"),
+            },
+            "quiet": False,
+            "no_warnings": False,
+        }
 
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
@@ -856,6 +876,7 @@ def main():
         languages=args.lang,
         quality=args.quality,
         cookies_from_browser=args.cookies,
+        audio_only=args.audio_only,
     )
 
     if result["success"]:

@@ -151,8 +151,19 @@ def transcribe_audio(
         
         if use_faster:
             print(f"加载 Whisper 模型 (faster-whisper): {model_size}")
-            # ... existing faster-whisper logic ...
-            model = WhisperModel(model_size, device=device, compute_type=compute_type)
+            print("ℹ️  如果是首次运行，程序将自动从 HuggingFace 下载模型文件，这可能需要几分钟，请耐心等待...")
+            try:
+                model = WhisperModel(model_size, device=device, compute_type=compute_type)
+            except Exception as e:
+                print(f"❌ 模型加载失败: {e}")
+                print("💡 提示: 模型下载可能因网络问题失败。")
+                print("   如果您在中国大陆，建议设置环境变量使用镜像站加速下载:")
+                print("   PowerShell: $env:HF_ENDPOINT = 'https://hf-mirror.com'")
+                print("   CMD:        set HF_ENDPOINT=https://hf-mirror.com")
+                print("   \n   或者尝试切换到 openai-whisper 引擎 (不需要访问 HuggingFace):")
+                print(f"   python parallel_transcribe.py --input \"{input_path}\" --engine openai_whisper")
+                raise e
+                
             print(f"开始转录: {input_path}")
             segments, info = model.transcribe(
                 str(input_path),
