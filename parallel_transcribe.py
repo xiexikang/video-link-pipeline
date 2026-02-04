@@ -84,9 +84,10 @@ def transcribe_audio(
     language: str = "auto",
     device: str = "auto",
     compute_type: str = "int8",
+    engine: str = "auto",
 ) -> dict:
     """
-    使用 faster-whisper 转录音频
+    使用 faster-whisper 或 openai-whisper 转录音频
     
     Args:
         input_path: 音频或视频文件路径
@@ -95,6 +96,7 @@ def transcribe_audio(
         language: 语言代码 (auto 为自动检测)
         device: 计算设备 (cpu, cuda, auto)
         compute_type: 计算类型 (int8, float16, float32)
+        engine: 转录引擎 (auto, faster_whisper, openai_whisper)
     
     Returns:
         dict: 转录结果
@@ -117,14 +119,39 @@ def transcribe_audio(
 
     try:
         use_faster = True
-        try:
-            from faster_whisper import WhisperModel
-        except Exception:
+        
+        # 确定使用的引擎
+        if engine == "openai_whisper":
             use_faster = False
+        elif engine == "faster_whisper":
+            use_faster = True
+        else:
+            # auto 模式，尝试导入 faster-whisper
+            try:
+                import faster_whisper
+                use_faster = True
+            except ImportError:
+                use_faster = False
+
+        # 如果决定使用 faster-whisper，尝试导入 WhisperModel
+        if use_faster:
+            try:
+                from faster_whisper import WhisperModel
+            except Exception as e:
+                if engine == "faster_whisper":
+                    # 如果用户显式指定使用 faster_whisper，则抛出异常
+                    raise ImportError(f"无法加载 faster-whisper: {e}")
+                
+                print(f"⚠️ 无法加载 faster-whisper: {e}")
+                print("   正在回退到 openai-whisper...")
+                use_faster = False
+        
         segments_list = []
         detected_language = None
+        
         if use_faster:
-            print(f"加载 Whisper 模型: {model_size}")
+            print(f"加载 Whisper 模型 (faster-whisper): {model_size}")
+            # ... existing faster-whisper logic ...
             model = WhisperModel(model_size, device=device, compute_type=compute_type)
             print(f"开始转录: {input_path}")
             segments, info = model.transcribe(
@@ -315,6 +342,9 @@ def main():
     parser.add_argument(
         "--json", "-j", action="store_true", help="输出JSON格式"
     )
+    parser.add_argument(
+        "--engine", "-e", default="auto", choices=["auto", "faster_whisper", "openai_whisper"], help="转录引擎 (默认: auto)"
+    )
 
     args = parser.parse_args()
 
@@ -390,6 +420,7 @@ def main():
         language=language,
         device=device,
         compute_type=compute_type,
+        engine=args.engine,
     )
 
     if args.json:

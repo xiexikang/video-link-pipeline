@@ -8,7 +8,7 @@ python download_video.py "https://www.kuaishou.com/short-video/3xhmkph45paqftm?c
 
 
 
-python download_video.py "https://www.douyin.com/video/7598190270382935334" --output-dir ./output --lang zh
+python download_video.py "https://www.bilibili.com/video/BV1ohoiY2Ebh?spm_id_from=333.788.videopod.sections&vd_source=c69aaaecd9074f90cbd37ce466e4ee92&p=3" --output-dir ./output --lang zh
 
 python parallel_transcribe.py --input output\How_to_think_in_English_,_Improve_your_English/video.mp4
 
@@ -19,3 +19,12 @@ python parallel_transcribe.py \
   --input output/Video_Title/video.mp4 \
   --model small \
   --language zh
+
+python generate_summary.py --transcript ".\output\全球首款，首飞成功！\transcript.txt" --provider deepseek
+
+python generate_summary.py --transcript ".\output\阳光型抑郁测试，看看你中了几条\transcript.txt" --provider deepseek
+
+
+python download_video.py "https://www.bilibili.com/video/BV1dkFGzGEcD/?spm_id_from=333.1007.tianma.5-4-18.click" --output-dir ./output --lang zh
+
+python parallel_transcribe.py --input output\2025软考中级软件评测师软测考点知识精讲完整版_p03_1.2考试大纲-详细考点分析-配套资料-学习方法/video.mp4

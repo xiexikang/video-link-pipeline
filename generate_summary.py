@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -136,6 +137,201 @@ def generate_summary_claude(
             "error": str(e),
         }
 
+
+def generate_summary_openai_compatible(
+    transcript: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.3,
+) -> Dict:
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key, base_url=base_url)
+
+        prompt = f"""请根据以下视频转录文本生成一份结构化的视频摘要。
+
+转录内容：
+{transcript[:15000]}
+
+请按以下格式输出（使用Markdown）：
+
+# 📹 视频摘要
+
+## 📌 一句话概括
+[用一句话概括视频核心内容]
+
+## 🔑 核心要点
+- [要点1]
+- [要点2]
+- [要点3]
+- [更多要点...]
+
+## 💬 关键语段
+[列出3-5个重要的引用或关键语段]
+
+## 📊 主题标签
+[列出5-10个相关标签，用逗号分隔]
+
+## ⭐ 整体评价
+[对视频内容质量、信息密度、实用性的简短评价]
+
+同时请输出一个JSON对象包含结构化数据。
+"""
+
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": "你是一个专业的视频内容分析助手，擅长提取视频的核心内容和关键信息。"},
+                {"role": "user", "content": prompt},
+            ],
+        )
+
+        content = response.choices[0].message.content
+
+        result = {
+            "raw_response": content,
+            "one_sentence_summary": "",
+            "key_points": [],
+            "key_quotes": [],
+            "tags": [],
+            "evaluation": "",
+            "confidence": 0.0,
+            "success": True,
+        }
+
+        try:
+            if "```json" in content:
+                json_str = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                json_str = content.split("```")[1].split("```")[0].strip()
+            else:
+                start = content.find("{")
+                end = content.rfind("}")
+                if start != -1 and end != -1:
+                    json_str = content[start : end + 1]
+                else:
+                    json_str = "{}"
+            json_data = json.loads(json_str)
+            result.update(json_data)
+        except Exception:
+            pass
+
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+def generate_summary_gemini(
+    transcript: str,
+    api_key: str,
+    model: str = "gemini-1.5-flash",
+    max_tokens: int = 4096,
+    temperature: float = 0.3,
+) -> Dict:
+    try:
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+        prompt = f"""请根据以下视频转录文本生成一份结构化的视频摘要。
+
+转录内容：
+{transcript[:15000]}
+
+请按以下格式输出（使用Markdown）：
+
+# 📹 视频摘要
+
+## 📌 一句话概括
+[用一句话概括视频核心内容]
+
+## 🔑 核心要点
+- [要点1]
+- [要点2]
+- [要点3]
+- [更多要点...]
+
+## 💬 关键语段
+[列出3-5个重要的引用或关键语段]
+
+## 📊 主题标签
+[列出5-10个相关标签，用逗号分隔]
+
+## ⭐ 整体评价
+[对视频内容质量、信息密度、实用性的简短评价]
+
+同时请输出一个JSON对象包含结构化数据。
+"""
+
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                }
+            ],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+
+        r = requests.post(endpoint, json=payload, timeout=60)
+        r.raise_for_status()
+        data = r.json()
+
+        content_text = ""
+        try:
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                content_text = "\n".join([p.get("text", "") for p in parts if isinstance(p, dict)])
+        except Exception:
+            content_text = json.dumps(data, ensure_ascii=False)
+
+        if not content_text:
+            content_text = json.dumps(data, ensure_ascii=False)
+
+        result = {
+            "raw_response": content_text,
+            "one_sentence_summary": "",
+            "key_points": [],
+            "key_quotes": [],
+            "tags": [],
+            "evaluation": "",
+            "confidence": 0.0,
+            "success": True,
+        }
+
+        try:
+            if "```json" in content_text:
+                json_str = content_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in content_text:
+                json_str = content_text.split("```")[1].split("```")[0].strip()
+            else:
+                start = content_text.find("{")
+                end = content_text.rfind("}")
+                if start != -1 and end != -1:
+                    json_str = content_text[start : end + 1]
+                else:
+                    json_str = "{}"
+            json_data = json.loads(json_str)
+            result.update(json_data)
+        except Exception:
+            pass
+
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
 
 def generate_summary_openai(
     transcript: str,
@@ -278,8 +474,20 @@ def generate_summary(
 
     if provider == "claude":
         api_key = api_keys.get("claude") or os.getenv("ANTHROPIC_API_KEY")
-    else:
+    elif provider == "openai":
         api_key = api_keys.get("openai") or os.getenv("OPENAI_API_KEY")
+    elif provider == "gemini":
+        api_key = api_keys.get("gemini") or os.getenv("GEMINI_API_KEY")
+    elif provider == "deepseek":
+        api_key = api_keys.get("deepseek") or os.getenv("DEEPSEEK_API_KEY")
+    elif provider in {"kimi", "moonshot"}:
+        api_key = api_keys.get("kimi") or api_keys.get("moonshot") or os.getenv("KIMI_API_KEY") or os.getenv("MOONSHOT_API_KEY")
+    elif provider == "minimax":
+        api_key = api_keys.get("minimax") or os.getenv("MINIMAX_API_KEY")
+    elif provider in {"glm", "zhipu"}:
+        api_key = api_keys.get("glm") or api_keys.get("zhipu") or os.getenv("GLM_API_KEY") or os.getenv("ZHIPU_API_KEY")
+    else:
+        api_key = None
 
     if not api_key:
         return {
@@ -298,7 +506,7 @@ def generate_summary(
             max_tokens=summary_config.get("max_tokens", 4096),
             temperature=summary_config.get("temperature", 0.3),
         )
-    else:
+    elif provider == "openai":
         result = generate_summary_openai(
             transcript=transcript,
             api_key=api_key,
@@ -306,6 +514,55 @@ def generate_summary(
             max_tokens=summary_config.get("max_tokens", 4096),
             temperature=summary_config.get("temperature", 0.3),
         )
+    elif provider == "gemini":
+        result = generate_summary_gemini(
+            transcript=transcript,
+            api_key=api_key,
+            model=summary_config.get("model", "gemini-1.5-flash"),
+            max_tokens=summary_config.get("max_tokens", 4096),
+            temperature=summary_config.get("temperature", 0.3),
+        )
+    elif provider == "deepseek":
+        result = generate_summary_openai_compatible(
+            transcript=transcript,
+            api_key=api_key,
+            base_url=summary_config.get("base_url", "https://api.deepseek.com"),
+            model=summary_config.get("model", "deepseek-chat"),
+            max_tokens=summary_config.get("max_tokens", 4096),
+            temperature=summary_config.get("temperature", 0.3),
+        )
+    elif provider in {"kimi", "moonshot"}:
+        result = generate_summary_openai_compatible(
+            transcript=transcript,
+            api_key=api_key,
+            base_url=summary_config.get("base_url", "https://api.moonshot.cn/v1"),
+            model=summary_config.get("model", "moonshot-v1-8k"),
+            max_tokens=summary_config.get("max_tokens", 4096),
+            temperature=summary_config.get("temperature", 0.3),
+        )
+    elif provider == "minimax":
+        result = generate_summary_openai_compatible(
+            transcript=transcript,
+            api_key=api_key,
+            base_url=summary_config.get("base_url", "https://api.minimax.chat/v1"),
+            model=summary_config.get("model", "abab5.5-chat"),
+            max_tokens=summary_config.get("max_tokens", 4096),
+            temperature=summary_config.get("temperature", 0.3),
+        )
+    elif provider in {"glm", "zhipu"}:
+        result = generate_summary_openai_compatible(
+            transcript=transcript,
+            api_key=api_key,
+            base_url=summary_config.get("base_url", "https://open.bigmodel.cn/api/paas/v4"),
+            model=summary_config.get("model", "glm-4"),
+            max_tokens=summary_config.get("max_tokens", 4096),
+            temperature=summary_config.get("temperature", 0.3),
+        )
+    else:
+        result = {
+            "success": False,
+            "error": f"不支持的 provider: {provider}",
+        }
 
     if result["success"]:
         # 保存 Markdown 格式摘要
@@ -344,7 +601,7 @@ def main():
     )
     parser.add_argument(
         "--provider", "-p",
-        choices=["claude", "openai"],
+        choices=["claude", "openai", "gemini", "deepseek", "kimi", "moonshot", "minimax", "glm", "zhipu"],
         help="AI 提供商 (覆盖配置)"
     )
     parser.add_argument(
@@ -352,6 +609,12 @@ def main():
     )
     parser.add_argument(
         "--json", "-j", action="store_true", help="输出JSON格式"
+    )
+    parser.add_argument(
+        "--model", help="模型名 (覆盖配置)"
+    )
+    parser.add_argument(
+        "--base-url", help="兼容接口 Base URL (覆盖配置)"
     )
 
     args = parser.parse_args()
@@ -363,6 +626,14 @@ def main():
     if args.provider:
         if "summary" not in config:
             config["summary"] = {}
+        
+        # 如果切换了 provider 且没有指定 model，则清除 config 中的 model，
+        # 避免沿用旧 provider 的模型配置
+        old_provider = config.get("summary", {}).get("provider")
+        if old_provider != args.provider and not args.model:
+            if "model" in config.get("summary", {}):
+                del config["summary"]["model"]
+
         config["summary"]["provider"] = args.provider
 
     if args.api_key:
@@ -372,6 +643,14 @@ def main():
             config["api_keys"]["claude"] = args.api_key
         else:
             config["api_keys"]["openai"] = args.api_key
+    if args.model:
+        if "summary" not in config:
+            config["summary"] = {}
+        config["summary"]["model"] = args.model
+    if args.base_url:
+        if "summary" not in config:
+            config["summary"] = {}
+        config["summary"]["base_url"] = args.base_url
 
     # 确定输出目录
     transcript_path = Path(args.transcript)
