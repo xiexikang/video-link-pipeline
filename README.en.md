@@ -1,6 +1,6 @@
-# Video Extraction & Processing System
+# video-link-pipeline
 
-This is a comprehensive toolset integrating video downloading, audio extraction, subtitle processing, speech transcription, and AI summary generation. It aims to help users quickly acquire content from major video platforms and perform deep processing using AI technology.
+This is a complete toolset integrating video downloading, audio extraction, subtitle processing, speech transcription, and AI summarization. It aims to help users quickly acquire content from major video platforms and perform in-depth processing using AI technology.
 
 ## ✨ Key Features
 
