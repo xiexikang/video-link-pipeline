@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-link-pipeline"
+version = "0.1.0a0"
+description = "Unified CLI pipeline for video download, transcription, summarization, and subtitle conversion."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "video-link-pipeline contributors" }
+]
+keywords = ["video", "yt-dlp", "whisper", "subtitle", "cli"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Operating System :: Microsoft :: Windows",
+  "Topic :: Multimedia :: Video",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+  "anthropic>=0.8.0",
+  "faster-whisper>=0.10.0",
+  "imageio-ffmpeg>=0.5.1",
+  "openai>=1.6.0",
+  "python-dotenv>=1.0.0",
+  "PyYAML>=6.0.1",
+  "requests>=2.31.0",
+  "tqdm>=4.66.0",
+  "typer>=0.12,<1.0",
+  "typing-extensions>=4.8.0; python_version < '3.11'",
+  "yt-dlp>=2023.12.30"
+]
+
+[project.optional-dependencies]
+selenium = [
+  "selenium>=4.0.0",
+  "webdriver-manager>=4.0.0"
+]
+dev = [
+  "mypy>=1.8.0",
+  "pre-commit>=3.6.0",
+  "pytest>=8.0.0",
+  "ruff>=0.3.0"
+]
+
+[project.scripts]
+vlp = "video_link_pipeline.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

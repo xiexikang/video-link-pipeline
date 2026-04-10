@@ -1,0 +1,23 @@
+anthropic>=0.8.0
+faster-whisper>=0.10.0
+imageio-ffmpeg>=0.5.1
+openai>=1.6.0
+python-dotenv>=1.0.0
+PyYAML>=6.0.1
+requests>=2.31.0
+tqdm>=4.66.0
+typer<1.0,>=0.12
+yt-dlp>=2023.12.30
+
+[:python_version < "3.11"]
+typing-extensions>=4.8.0
+
+[dev]
+mypy>=1.8.0
+pre-commit>=3.6.0
+pytest>=8.0.0
+ruff>=0.3.0
+
+[selenium]
+selenium>=4.0.0
+webdriver-manager>=4.0.0

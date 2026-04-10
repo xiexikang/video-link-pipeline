@@ -1,0 +1,1 @@
+﻿"""FFmpeg resolution placeholders."""
