@@ -7,9 +7,10 @@ from typing import Any
 
 import typer
 
+from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
-from . import logging as log
+from .subtitles.convert import batch_convert_subtitles, convert_subtitle_file
 
 app = typer.Typer(
     help="Unified CLI for video download, transcription, summarization, and subtitle conversion.",
@@ -75,14 +76,30 @@ def summarize_command(
 @app.command("convert-subtitle")
 def convert_subtitle_command(
     input_path: Path = typer.Argument(..., help="Subtitle file or directory."),
+    output_path: Path | None = typer.Option(None, "--output", help="Output subtitle file path."),
     output_format: str | None = typer.Option(None, "--format", help="Target subtitle format."),
+    batch: bool = typer.Option(False, "--batch", help="Convert matching subtitle files in a directory."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     """Convert subtitle files between VTT and SRT."""
     if not input_path.exists():
         raise InputNotFoundError(f"subtitle input does not exist: {input_path}")
-    bundle = _command_context(config)
-    _render_placeholder("convert-subtitle", bundle, f"input={input_path} format={output_format}")
+    _command_context(config)
+
+    if batch:
+        result = batch_convert_subtitles(input_path, output_format or "srt")
+        log.success(
+            f"batch subtitle conversion completed: {result['converted_files']}/{result['matched_files']}"
+        )
+        return
+
+    result = convert_subtitle_file(input_path, output_path=output_path, output_format=output_format)
+    if result["changed"]:
+        log.success("subtitle conversion completed")
+    else:
+        log.info(str(result["message"]))
+    log.info(f"input={result['input_path']} ({result['input_format']})")
+    log.info(f"output={result['output_path']} ({result['output_format']})")
 
 
 @app.command("run")
