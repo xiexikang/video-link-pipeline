@@ -1,0 +1,2 @@
+[console_scripts]
+vlp = video_link_pipeline.cli:main
