@@ -9,6 +9,7 @@ import typer
 
 from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
+from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
 from .subtitles.convert import batch_convert_subtitles, convert_subtitle_file
 
@@ -40,11 +41,52 @@ def _render_placeholder(command_name: str, bundle: ConfigBundle, extra: str) -> 
 def download_command(
     url: str,
     output_dir: Path | None = typer.Option(None, "--output-dir", help="Output root directory."),
+    sub_lang: list[str] | None = typer.Option(None, "--sub-lang", help="Subtitle languages."),
+    quality: str | None = typer.Option(None, "--quality", help="yt-dlp format selector."),
+    audio_only: bool = typer.Option(False, "--audio-only", help="Download audio only."),
+    cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
+    cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     """Download a video URL into a managed job directory."""
-    bundle = _command_context(config, {"output_dir": str(output_dir) if output_dir else None})
-    _render_placeholder("download", bundle, f"url={url}")
+    overrides = {
+        "output_dir": str(output_dir) if output_dir else None,
+        "download": {
+            "subtitles_langs": sub_lang,
+            "quality": quality,
+            "cookie_file": str(cookie_file) if cookie_file else None,
+            "cookies_from_browser": cookies_from_browser,
+        },
+    }
+    bundle = _command_context(config, overrides)
+    effective = bundle.effective_config
+    download_config = effective["download"]
+
+    log.info(f"loaded configuration from {bundle.source_path or 'defaults/.env/environment'}")
+    log.info(f"output_dir={effective['output_dir']}")
+    result = execute_download(
+        url=url,
+        output_dir=effective["output_dir"],
+        languages=download_config["subtitles_langs"],
+        quality=download_config["quality"],
+        audio_only=audio_only,
+        cookies_from_browser=download_config.get("cookies_from_browser"),
+        cookie_file=download_config.get("cookie_file"),
+    )
+
+    if not result["success"]:
+        raise VlpError(str(result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
+
+    log.success("download completed")
+    log.info(f"folder={result['folder']}")
+    if result.get("video"):
+        log.info(f"video={result['video']}")
+    if result.get("audio"):
+        log.info(f"audio={result['audio']}")
+    if result.get("subtitle"):
+        log.info(f"subtitle={result['subtitle']}")
+    if result.get("needs_whisper"):
+        log.warning("download completed without subtitles; transcription may be needed")
 
 
 @app.command("transcribe")
