@@ -11,7 +11,9 @@ from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
 from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
+from .manifest import upsert_manifest
 from .subtitles.convert import batch_convert_subtitles, convert_subtitle_file
+from .transcribe.service import transcribe_path
 
 app = typer.Typer(
     help="Unified CLI for video download, transcription, summarization, and subtitle conversion.",
@@ -35,6 +37,124 @@ def _render_placeholder(command_name: str, bundle: ConfigBundle, extra: str) -> 
         f"{command_name} command has not been migrated into the new package yet.",
         hint=extra,
     )
+
+
+def _absolute_from_root(path_value: str | None, output_root: Path) -> Path | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    cwd = Path.cwd().resolve()
+    root_abs = (cwd / output_root).resolve()
+    path_abs = (cwd / path).resolve()
+    if root_abs in path_abs.parents or path_abs == root_abs:
+        return path_abs
+    return (root_abs / path).resolve()
+
+
+def _relative_to_root(path_value: str | None, output_root: Path) -> str | None:
+    absolute_path = _absolute_from_root(path_value, output_root)
+    if absolute_path is None:
+        return None
+    root_abs = (Path.cwd().resolve() / output_root).resolve()
+    try:
+        return str(absolute_path.relative_to(root_abs))
+    except ValueError:
+        return str(absolute_path)
+
+
+def _download_manifest_path(result: dict[str, object], output_root: Path) -> Path | None:
+    folder = result.get("folder")
+    folder_path = _absolute_from_root(str(folder) if folder else None, output_root)
+    if folder_path is None:
+        return None
+    return folder_path / "manifest.json"
+
+
+def _write_download_manifest(
+    *,
+    result: dict[str, object],
+    effective_config: dict[str, Any],
+    output_root: Path,
+    url: str,
+    audio_only: bool,
+) -> Path | None:
+    manifest_path = _download_manifest_path(result, output_root)
+    if manifest_path is None:
+        return None
+
+    folder = _relative_to_root(str(result.get("folder")) if result.get("folder") else None, output_root)
+    artifacts = {
+        "folder": folder,
+        "video": result.get("video"),
+        "audio": result.get("audio"),
+        "subtitle_vtt": result.get("subtitle_vtt"),
+        "subtitle_srt": result.get("subtitle_srt"),
+        "info_json": result.get("info"),
+    }
+    config_snapshot = redact_config(effective_config)
+    config_snapshot["download"] = dict(config_snapshot.get("download", {}))
+    config_snapshot["download"]["audio_only"] = audio_only
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp download",
+        input_data={"url": url, "input_path": None},
+        config_effective=config_snapshot,
+        artifacts={key: value for key, value in artifacts.items() if value is not None},
+        execution={
+            "download": {
+                "success": bool(result.get("success")),
+                "used_selenium_fallback": bool(result.get("used_selenium_fallback", False)),
+                "error_code": None if result.get("success") else "DOWNLOAD_FAILED",
+                "error": result.get("error"),
+                "warnings": [],
+            }
+        },
+    )
+    return manifest_path
+
+
+def _write_transcribe_manifest(
+    *,
+    result: dict[str, object],
+    effective_config: dict[str, Any],
+    output_root: Path,
+    input_path: Path,
+) -> Path | None:
+    transcript_file = result.get("transcript_file")
+    transcript_path = Path(str(transcript_file)) if transcript_file else None
+    if transcript_path is None:
+        return None
+    manifest_path = transcript_path.parent / "manifest.json"
+
+    config_snapshot = redact_config(effective_config)
+    artifacts = {
+        "transcript_txt": _relative_to_root(str(result.get("transcript_file")), output_root),
+        "subtitle_srt": _relative_to_root(str(result.get("srt_file")), output_root),
+        "subtitle_vtt": _relative_to_root(str(result.get("vtt_file")), output_root),
+        "transcript_json": _relative_to_root(str(result.get("json_file")), output_root),
+    }
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp transcribe",
+        input_data={"url": None, "input_path": str(input_path)},
+        config_effective=config_snapshot,
+        artifacts={key: value for key, value in artifacts.items() if value is not None},
+        execution={
+            "transcribe": {
+                "success": bool(result.get("success")),
+                "detected_language": result.get("detected_language"),
+                "engine": result.get("engine"),
+                "error_code": None if result.get("success") else "TRANSCRIBE_FAILED",
+                "error": result.get("error"),
+                "warnings": [],
+            }
+        },
+    )
+    return manifest_path
 
 
 @app.command("download")
@@ -61,6 +181,7 @@ def download_command(
     bundle = _command_context(config, overrides)
     effective = bundle.effective_config
     download_config = effective["download"]
+    output_root = Path(effective["output_dir"])
 
     log.info(f"loaded configuration from {bundle.source_path or 'defaults/.env/environment'}")
     log.info(f"output_dir={effective['output_dir']}")
@@ -72,6 +193,14 @@ def download_command(
         audio_only=audio_only,
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
+    )
+
+    manifest_path = _write_download_manifest(
+        result=result,
+        effective_config=effective,
+        output_root=output_root,
+        url=url,
+        audio_only=audio_only,
     )
 
     if not result["success"]:
@@ -87,19 +216,62 @@ def download_command(
         log.info(f"subtitle={result['subtitle']}")
     if result.get("needs_whisper"):
         log.warning("download completed without subtitles; transcription may be needed")
+    if manifest_path is not None:
+        log.info(f"manifest={manifest_path}")
 
 
 @app.command("transcribe")
 def transcribe_command(
     path: Path,
     output_dir: Path | None = typer.Option(None, "--output-dir", help="Output directory."),
+    model: str | None = typer.Option(None, "--model", help="Whisper model size."),
+    language: str | None = typer.Option(None, "--language", help="Language code or auto."),
+    engine: str | None = typer.Option(None, "--engine", help="Transcription engine: auto/faster/openai."),
+    device: str | None = typer.Option(None, "--device", help="Device: auto/cpu/cuda."),
+    compute_type: str | None = typer.Option(None, "--compute-type", help="Compute type: int8/float16/float32."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     """Transcribe an audio or video path."""
     if not path.exists():
         raise InputNotFoundError(f"input path does not exist: {path}")
-    bundle = _command_context(config, {"output_dir": str(output_dir) if output_dir else None})
-    _render_placeholder("transcribe", bundle, f"input={path}")
+    overrides = {
+        "output_dir": str(output_dir) if output_dir else None,
+        "whisper": {
+            "model": model,
+            "language": language,
+            "engine": engine,
+            "device": device,
+            "compute_type": compute_type,
+        },
+    }
+    bundle = _command_context(config, overrides)
+    whisper_config = bundle.effective_config["whisper"]
+    resolved_output_root = Path(output_dir) if output_dir else path.parent
+    result = transcribe_path(
+        input_path=path,
+        output_dir=bundle.effective_config["output_dir"] if output_dir else None,
+        model_size=whisper_config["model"],
+        language=whisper_config["language"],
+        device=whisper_config["device"],
+        compute_type=whisper_config["compute_type"],
+        engine=whisper_config["engine"],
+    )
+    manifest_path = _write_transcribe_manifest(
+        result=result,
+        effective_config=bundle.effective_config,
+        output_root=resolved_output_root,
+        input_path=path,
+    )
+    if not result["success"]:
+        raise VlpError(str(result["error"] or "transcription failed"), error_code="TRANSCRIBE_FAILED")
+    log.success("transcription completed")
+    log.info(f"transcript={result['transcript_file']}")
+    log.info(f"srt={result['srt_file']}")
+    log.info(f"vtt={result['vtt_file']}")
+    if result.get("detected_language"):
+        log.info(f"detected_language={result['detected_language']}")
+    if manifest_path is not None:
+        log.info(f"manifest={manifest_path}")
 
 
 @app.command("summarize")
