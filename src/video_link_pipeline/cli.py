@@ -13,6 +13,7 @@ from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
 from .manifest import upsert_manifest
 from .subtitles.convert import batch_convert_subtitles, convert_subtitle_file
+from .summarize.service import summarize_transcript
 from .transcribe.service import transcribe_path
 
 app = typer.Typer(
@@ -157,6 +158,42 @@ def _write_transcribe_manifest(
     return manifest_path
 
 
+def _write_summary_manifest(
+    *,
+    result: dict[str, object],
+    effective_config: dict[str, Any],
+    output_root: Path,
+    transcript_path: Path,
+) -> Path | None:
+    summary_file = result.get("summary_file")
+    summary_path = Path(str(summary_file)) if summary_file else None
+    if summary_path is None:
+        return None
+    manifest_path = summary_path.parent / "manifest.json"
+    config_snapshot = redact_config(effective_config)
+    artifacts = {
+        "summary_md": _relative_to_root(str(result.get("summary_file")), output_root),
+        "keywords_json": _relative_to_root(str(result.get("keywords_file")), output_root),
+    }
+    upsert_manifest(
+        manifest_path,
+        command="vlp summarize",
+        input_data={"url": None, "input_path": str(transcript_path)},
+        config_effective=config_snapshot,
+        artifacts={key: value for key, value in artifacts.items() if value is not None},
+        execution={
+            "summarize": {
+                "success": bool(result.get("success")),
+                "provider": result.get("provider"),
+                "error_code": None if result.get("success") else "SUMMARY_FAILED",
+                "error": result.get("error"),
+                "warnings": [],
+            }
+        },
+    )
+    return manifest_path
+
+
 @app.command("download")
 def download_command(
     url: str,
@@ -168,7 +205,6 @@ def download_command(
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    """Download a video URL into a managed job directory."""
     overrides = {
         "output_dir": str(output_dir) if output_dir else None,
         "download": {
@@ -231,7 +267,6 @@ def transcribe_command(
     compute_type: str | None = typer.Option(None, "--compute-type", help="Compute type: int8/float16/float32."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    """Transcribe an audio or video path."""
     if not path.exists():
         raise InputNotFoundError(f"input path does not exist: {path}")
     overrides = {
@@ -278,13 +313,47 @@ def transcribe_command(
 def summarize_command(
     transcript: Path,
     output_dir: Path | None = typer.Option(None, "--output-dir", help="Output directory."),
+    provider: str | None = typer.Option(None, "--provider", help="Summary provider."),
+    model: str | None = typer.Option(None, "--model", help="Provider model name."),
+    base_url: str | None = typer.Option(None, "--base-url", help="OpenAI-compatible base URL."),
+    max_tokens: int | None = typer.Option(None, "--max-tokens", help="Maximum output tokens."),
+    temperature: float | None = typer.Option(None, "--temperature", help="Sampling temperature."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    """Generate a structured summary from a transcript file."""
     if not transcript.exists():
         raise InputNotFoundError(f"transcript file does not exist: {transcript}")
-    bundle = _command_context(config, {"output_dir": str(output_dir) if output_dir else None})
-    _render_placeholder("summarize", bundle, f"transcript={transcript}")
+    overrides = {
+        "output_dir": str(output_dir) if output_dir else None,
+        "summary": {
+            "provider": provider,
+            "model": model,
+            "base_url": base_url,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        },
+    }
+    bundle = _command_context(config, overrides)
+    resolved_output_root = Path(output_dir) if output_dir else transcript.parent
+    result = summarize_transcript(
+        transcript_path=transcript,
+        output_dir=bundle.effective_config["output_dir"] if output_dir else None,
+        config=bundle.effective_config,
+    )
+    manifest_path = _write_summary_manifest(
+        result=result,
+        effective_config=bundle.effective_config,
+        output_root=resolved_output_root,
+        transcript_path=transcript,
+    )
+    if not result["success"]:
+        raise VlpError(str(result["error"] or "summary generation failed"), error_code="SUMMARY_FAILED")
+    log.success("summary completed")
+    log.info(f"summary={result['summary_file']}")
+    log.info(f"keywords={result['keywords_file']}")
+    if result.get("one_sentence_summary"):
+        log.info(f"one_sentence_summary={result['one_sentence_summary']}")
+    if manifest_path is not None:
+        log.info(f"manifest={manifest_path}")
 
 
 @app.command("convert-subtitle")
@@ -295,7 +364,6 @@ def convert_subtitle_command(
     batch: bool = typer.Option(False, "--batch", help="Convert matching subtitle files in a directory."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    """Convert subtitle files between VTT and SRT."""
     if not input_path.exists():
         raise InputNotFoundError(f"subtitle input does not exist: {input_path}")
     _command_context(config)
@@ -323,7 +391,6 @@ def run_command(
     do_summary: bool = typer.Option(False, "--do-summary", help="Run summary step."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    """Run the end-to-end pipeline for a URL."""
     bundle = _command_context(config)
     _render_placeholder(
         "run",
@@ -334,7 +401,6 @@ def run_command(
 
 @app.command("doctor")
 def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML.")) -> None:
-    """Run environment diagnostics for the current installation."""
     bundle = _command_context(config)
     redacted = redact_config(bundle.effective_config)
     log.info("doctor command is not implemented yet.")
@@ -343,7 +409,6 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
 
 
 def main() -> int:
-    """Entrypoint used by the installed `vlp` script."""
     try:
         app()
     except VlpError as exc:
