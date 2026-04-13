@@ -467,6 +467,7 @@ Representative warning codes include:
 - Groups output into `runtime`, `download prerequisites`, and `config risks`
 - Checks risky download config combinations such as conflicting cookie sources
 - Provides actionable remediation guidance
+- Uses `WARN` for blocking conflicts and `INFO` for non-blocking but noteworthy config-risk items
 
 ## Dependency Strategy
 

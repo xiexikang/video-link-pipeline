@@ -55,6 +55,11 @@ pip install -e .[dev]
 - `download.selenium`、`cookies_from_browser`、`cookie_file` 的组合风险或冲突
 - 对常见 Windows 锁库、驱动缺失、FFmpeg 缺失问题的修复建议
 
+其中 `config risks` 段里的输出层级约定是：
+
+- `WARN`：已经存在明显冲突、无效配置或可能直接阻塞流程的问题
+- `INFO`：当前配置可运行，但属于“值得注意”的建议项，不表示硬错误
+
 安装完成后可以先检查命令是否可用：
 
 ```bash
