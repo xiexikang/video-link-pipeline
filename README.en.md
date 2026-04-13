@@ -55,6 +55,11 @@ pip install -e .[dev]
 - combination risks or conflicts between `download.selenium`, `cookies_from_browser`, and `cookie_file`
 - focused remediation hints for common Windows issues such as locked cookie databases, missing drivers, and missing FFmpeg
 
+Within the `config risks` section, the output levels mean:
+
+- `WARN`: a real conflict, invalid configuration, or something that may directly block the workflow
+- `INFO`: the current configuration is still usable, but the item is worth attention and should not be treated as a hard failure
+
 Quick verification:
 
 ```bash
