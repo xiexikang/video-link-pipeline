@@ -464,6 +464,8 @@ Representative warning codes include:
 
 - Performs environment diagnostics
 - Reports availability and selected executable paths
+- Groups output into `runtime`, `download prerequisites`, and `config risks`
+- Checks risky download config combinations such as conflicting cookie sources
 - Provides actionable remediation guidance
 
 ## Dependency Strategy
@@ -531,6 +533,7 @@ Behavior:
 - If the failure looks like anti-crawling, cookies, verification, or unsupported short-video extraction, evaluate fallback
 - If Selenium extra is not installed, emit a short actionable hint instead of a confusing traceback
 - If Selenium extra is installed and mode allows it, attempt fallback extraction
+- `vlp doctor` should also flag risky combinations such as `selenium=off` with no cookie source or both `cookies_from_browser` and `cookie_file` being set
 
 Supported values:
 
@@ -616,6 +619,7 @@ Testing guidelines:
 - Keep subtitle conversion tests pure and file-light
 - Local development should use the same baseline commands as CI: `python -m ruff check .` and `python -m pytest`
 - Installing the `dev` extra should be the documented way to obtain `pytest`, `ruff`, and other local verification tools
+- Doctor tests should cover both dependency availability and configuration-risk reporting
 
 ## CI Strategy
 

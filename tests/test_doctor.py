@@ -92,6 +92,7 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
     assert "runtime:" in result.stdout
     assert "download prerequisites:" in result.stdout
     assert "config risks:" in result.stdout
+    assert "[INFO] download_config: download selenium=off and no cookie source is configured" in result.stdout
     assert "doctor checks passed" in result.stdout
 
 

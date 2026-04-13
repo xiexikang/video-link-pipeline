@@ -593,6 +593,21 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     guidance = doctor_guidance(checks)
 
     has_failures = False
+
+    def _render_doctor_check(check: object) -> None:
+        nonlocal has_failures
+        section = str(getattr(check, "section", "download_prerequisites"))
+        if bool(getattr(check, "ok", False)):
+            if section == "config_risks":
+                log.info(f"{check.name}: {check.detail}")
+            else:
+                log.success(f"{check.name}: {check.detail}")
+        else:
+            has_failures = True
+            log.warning(f"{check.name}: {check.detail}")
+        if check.hint:
+            log.info(f"hint: {check.hint}")
+
     sections = [
         ("runtime", "runtime:"),
         ("download_prerequisites", "download prerequisites:"),
@@ -604,24 +619,12 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
             continue
         log.info(section_title)
         for check in section_checks:
-            if check.ok:
-                log.success(f"{check.name}: {check.detail}")
-            else:
-                has_failures = True
-                log.warning(f"{check.name}: {check.detail}")
-            if check.hint:
-                log.info(f"hint: {check.hint}")
+            _render_doctor_check(check)
 
     for check in checks:
-        if getattr(check, "section", "download_prerequisites") in {"runtime", "download_prerequisites"}:
+        if getattr(check, "section", "download_prerequisites") in {"runtime", "download_prerequisites", "config_risks"}:
             continue
-        if check.ok:
-            log.success(f"{check.name}: {check.detail}")
-        else:
-            has_failures = True
-            log.warning(f"{check.name}: {check.detail}")
-        if check.hint:
-            log.info(f"hint: {check.hint}")
+        _render_doctor_check(check)
 
     if guidance:
         log.info("common diagnostic guidance:")
