@@ -46,6 +46,12 @@ def main() -> int:
         action="store_true",
         help="仅下载音频",
     )
+    parser.add_argument(
+        "--selenium",
+        choices=["auto", "on", "off"],
+        default="auto",
+        help="Selenium 兜底模式",
+    )
     parser.add_argument("--json", "-j", action="store_true", help="输出 JSON 结果")
     args = parser.parse_args()
 
@@ -57,6 +63,7 @@ def main() -> int:
             quality=args.quality,
             audio_only=args.audio_only,
             cookies_from_browser=args.cookies,
+            selenium_mode=args.selenium,
         )
     except VlpError as exc:
         log.render_vlp_error(exc)

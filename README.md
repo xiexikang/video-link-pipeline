@@ -118,6 +118,7 @@ VLP_SUMMARY_PROVIDER=claude
 
 - 旧配置 `summary.api_keys.*` 仍会被兼容读取，但会给出迁移 warning
 - `vlp doctor` 会提示当前 FFmpeg 来源和 Selenium/cookies 相关问题
+- `--selenium auto|on|off` 已接入 `download` 和 `run`
 
 ## 使用方式
 
@@ -129,6 +130,7 @@ vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
 vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
+vlp download "https://..." --selenium auto
 ```
 
 ### 转录

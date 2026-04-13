@@ -228,6 +228,7 @@ def download_command(
     audio_only: bool = typer.Option(False, "--audio-only", help="Download audio only."),
     cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
+    selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     overrides = {
@@ -237,6 +238,7 @@ def download_command(
             "quality": quality,
             "cookie_file": str(cookie_file) if cookie_file else None,
             "cookies_from_browser": cookies_from_browser,
+            "selenium": selenium,
         },
     }
     bundle = _command_context(config, overrides)
@@ -254,6 +256,7 @@ def download_command(
         audio_only=audio_only,
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
+        selenium_mode=download_config["selenium"],
     )
 
     manifest_path = _write_download_manifest(
@@ -419,6 +422,7 @@ def run_command(
     quality: str | None = typer.Option(None, "--quality", help="yt-dlp format selector."),
     cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
+    selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     overrides = {
@@ -428,6 +432,7 @@ def run_command(
             "quality": quality,
             "cookie_file": str(cookie_file) if cookie_file else None,
             "cookies_from_browser": cookies_from_browser,
+            "selenium": selenium,
         },
     }
     bundle = _command_context(config, overrides)
@@ -447,6 +452,7 @@ def run_command(
         audio_only=False,
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
+        selenium_mode=download_config["selenium"],
     )
     manifest_path = _write_download_manifest(
         result=download_result,
