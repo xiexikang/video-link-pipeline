@@ -48,6 +48,7 @@ pip install -e .[dev]
 
 `vlp doctor` currently highlights:
 
+- grouped output sections such as `runtime`, `download prerequisites`, and `common diagnostic guidance`
 - the final FFmpeg selection source and path, such as system `ffmpeg` or `imageio-ffmpeg`
 - whether the Selenium extra is fully available
 - whether cookies are configured via browser extraction or file path

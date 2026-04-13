@@ -25,6 +25,7 @@ class DoctorCheck:
     name: str
     ok: bool
     detail: str
+    section: str = "download_prerequisites"
     code: str | None = None
     hint: str | None = None
 
@@ -63,13 +64,13 @@ def _check_python_runtime() -> DoctorCheck:
     ok = (version.major, version.minor) >= (3, 10)
     detail = f"Python {version.major}.{version.minor}.{version.micro}"
     hint = None if ok else "video-link-pipeline requires Python 3.10 or newer"
-    return DoctorCheck(name="python", ok=ok, detail=detail, hint=hint)
+    return DoctorCheck(name="python", ok=ok, detail=detail, section="runtime", hint=hint)
 
 
 def _check_python_executable() -> DoctorCheck:
     executable = Path(sys.executable).resolve()
     detail = f"python executable: {executable}"
-    return DoctorCheck(name="python_env", ok=True, detail=detail)
+    return DoctorCheck(name="python_env", ok=True, detail=detail, section="runtime")
 
 
 def _check_ffmpeg() -> DoctorCheck:
@@ -80,6 +81,7 @@ def _check_ffmpeg() -> DoctorCheck:
             name="ffmpeg",
             ok=False,
             detail="ffmpeg was not found in PATH and imageio-ffmpeg is unavailable",
+            section="download_prerequisites",
             code="ffmpeg_unavailable",
             hint=preferred_warning_hint("ffmpeg_unavailable"),
         )
@@ -89,7 +91,13 @@ def _check_ffmpeg() -> DoctorCheck:
         detail = f"selected ffmpeg source=system path={Path(system_ffmpeg).resolve()}"
     else:
         detail = f"selected ffmpeg source=imageio-ffmpeg path={selected_path}"
-    return DoctorCheck(name="ffmpeg", ok=True, detail=detail, code="ffmpeg_unavailable")
+    return DoctorCheck(
+        name="ffmpeg",
+        ok=True,
+        detail=detail,
+        section="download_prerequisites",
+        code="ffmpeg_unavailable",
+    )
 
 
 def _check_selenium_extra() -> DoctorCheck:
@@ -103,6 +111,7 @@ def _check_selenium_extra() -> DoctorCheck:
             name="selenium",
             ok=True,
             detail=detail,
+            section="download_prerequisites",
             code="browser_driver_unavailable",
             hint=preferred_warning_hint("browser_driver_unavailable", hint),
         )
@@ -125,6 +134,7 @@ def _check_selenium_extra() -> DoctorCheck:
         name="selenium",
         ok=False,
         detail=detail,
+        section="download_prerequisites",
         code="browser_driver_unavailable",
         hint=preferred_warning_hint("browser_driver_unavailable", hint),
     )
@@ -143,6 +153,7 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
                     name="cookies",
                     ok=False,
                     detail=f"configured browser cookies source is not recognized: {browser}",
+                    section="download_prerequisites",
                     code="browser_cookie_locked",
                     hint="supported browsers: chrome, edge, firefox, opera, brave, vivaldi, safari",
                 )
@@ -157,6 +168,7 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
                 name="cookies",
                 ok=True,
                 detail=f"configured browser cookies source: {browser_name} (yt-dlp cookiesfrombrowser)",
+                section="download_prerequisites",
                 code="browser_cookie_locked",
                 hint=preferred_warning_hint("browser_cookie_locked", windows_hint),
             )
@@ -172,13 +184,23 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
         else:
             detail = f"{detail} exists=no"
             hint = "export a Netscape-format cookies.txt file and point --cookie-file to it"
-        return [DoctorCheck(name="cookies", ok=ok, detail=detail, code=None, hint=hint)]
+        return [
+            DoctorCheck(
+                name="cookies",
+                ok=ok,
+                detail=detail,
+                section="download_prerequisites",
+                code=None,
+                hint=hint,
+            )
+        ]
 
     return [
         DoctorCheck(
             name="cookies",
             ok=True,
             detail="no cookie source configured",
+            section="download_prerequisites",
             code="primary_auth_required",
             hint=preferred_warning_hint(
                 "primary_auth_required",

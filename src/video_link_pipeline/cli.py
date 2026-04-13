@@ -593,7 +593,27 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     guidance = doctor_guidance(checks)
 
     has_failures = False
+    sections = [
+        ("runtime", "runtime:"),
+        ("download_prerequisites", "download prerequisites:"),
+    ]
+    for section_key, section_title in sections:
+        section_checks = [check for check in checks if getattr(check, "section", "download_prerequisites") == section_key]
+        if not section_checks:
+            continue
+        log.info(section_title)
+        for check in section_checks:
+            if check.ok:
+                log.success(f"{check.name}: {check.detail}")
+            else:
+                has_failures = True
+                log.warning(f"{check.name}: {check.detail}")
+            if check.hint:
+                log.info(f"hint: {check.hint}")
+
     for check in checks:
+        if getattr(check, "section", "download_prerequisites") in {"runtime", "download_prerequisites"}:
+            continue
         if check.ok:
             log.success(f"{check.name}: {check.detail}")
         else:
