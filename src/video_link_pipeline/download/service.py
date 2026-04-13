@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from yt_dlp import YoutubeDL
 
@@ -312,8 +313,9 @@ def _retry_with_selenium_context(
     audio_only: bool,
     result: dict[str, object],
 ) -> dict[str, object]:
+    retry_url = context.media_hint_url or context.canonical_url or context.resolved_url
     preparation = probe_download(
-        url=context.resolved_url,
+        url=retry_url,
         output_dir=output_dir,
         languages=languages,
         quality=quality,
@@ -321,10 +323,13 @@ def _retry_with_selenium_context(
         cookie_file=context.cookie_file,
     )
     preparation.output_dir.mkdir(parents=True, exist_ok=True)
+    origin = _origin_from_url(context.canonical_url or context.resolved_url)
     preparation.ydl_options["http_headers"] = {
         "User-Agent": context.user_agent,
-        "Referer": context.referer,
+        "Referer": context.canonical_url or context.referer,
     }
+    if origin:
+        preparation.ydl_options["http_headers"]["Origin"] = origin
 
     result.update(
         {
@@ -333,6 +338,8 @@ def _retry_with_selenium_context(
             "ffmpeg_path": preparation.ffmpeg_path,
         }
     )
+    if context.page_description and not result.get("error"):
+        result["error"] = context.page_description
 
     artifacts = _execute_ydl_download(preparation)
     _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
@@ -344,6 +351,15 @@ def _retry_with_selenium_context(
         output_root=preparation.output_root,
         audio_only=audio_only,
     )
+
+
+def _origin_from_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def execute_download(
