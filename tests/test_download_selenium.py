@@ -47,6 +47,7 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert result["warning_details"][0]["code"] == "primary_http_403"
     assert result["warning_details"][0]["description"]
     assert result["warning_details"][1]["code"] == "fallback_dependency_hint"
+    assert "pip install 'video-link-pipeline[selenium]'" in str(result["hint"])
     assert "optional dependencies are not installed" in str(result["error"])
 
 
@@ -308,6 +309,7 @@ def test_execute_download_classifies_cookie_lock_warning(monkeypatch, tmp_path: 
 
     codes = [item["code"] for item in result["warning_details"]]
     assert "browser_cookie_locked" in codes
+    assert "Close the target browser completely" in str(result["hint"])
 
 
 def test_choose_best_media_hint_prefers_streamable_urls() -> None:

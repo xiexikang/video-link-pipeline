@@ -325,6 +325,7 @@ Example:
       "fallback_status": "dependency_missing",
       "error_code": "DEPENDENCY_MISSING",
       "error": "selenium fallback requested but optional dependencies are not installed",
+      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
         "install with: pip install \"video-link-pipeline[selenium]\""
@@ -371,6 +372,7 @@ Example:
 - Writes should be atomic to avoid partial or corrupted files
 - `execution.download` should preserve both human-readable `warnings` and structured `warning_details`
 - `warning_details` should carry stable `code`, `stage`, `message`, and `description` fields for batch processing
+- `execution.download.hint` should carry the best user-facing remediation available for the current failure path
 - Selenium retry diagnostics should be represented with `fallback_status` and `fallback_context` rather than requiring log scraping
 
 ### Download Diagnostics Contract

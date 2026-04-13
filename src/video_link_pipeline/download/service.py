@@ -13,7 +13,7 @@ from yt_dlp import YoutubeDL
 from ..errors import ConfigError, DependencyMissingError, VlpError
 from ..transcribe.ffmpeg import resolve_ffmpeg_executable
 from .cookies import CookieSource, build_cookie_options, normalize_cookie_source
-from .diagnostics import WARNING_CODES, warning_code_description
+from .diagnostics import WARNING_CODES, warning_code_description, warning_code_remediation
 from .selenium_fallback import (
     SeleniumContext,
     SeleniumFallbackError,
@@ -68,8 +68,21 @@ def _append_warning(
             "message": message,
             "stage": stage,
             "description": warning_code_description(code) or "",
+            "remediation": warning_code_remediation(code) or "",
         }
     )
+
+
+def _set_result_hint(result: dict[str, object], hint: str | None, *, overwrite: bool = False) -> None:
+    normalized = str(hint or "").strip()
+    if not normalized:
+        return
+    if overwrite or not result.get("hint"):
+        result["hint"] = normalized
+
+
+def _apply_warning_remediation(result: dict[str, object], code: str, *, overwrite: bool = False) -> None:
+    _set_result_hint(result, warning_code_remediation(code), overwrite=overwrite)
 
 
 def _classify_primary_warning(error_message: str) -> str:
@@ -478,6 +491,7 @@ def execute_download(
         "warning_details": [],
         "fallback_context": None,
         "error": None,
+        "hint": None,
     }
 
     try:
@@ -549,6 +563,7 @@ def _handle_download_failure(
         message=f"primary download failed and triggered selenium fallback: {error_message}",
         stage="primary_download",
     )
+    _apply_warning_remediation(result, _classify_primary_warning(error_message))
 
     try:
         context = run_selenium_browser_context(
@@ -571,6 +586,7 @@ def _handle_download_failure(
                 result["error_code"] = "DEPENDENCY_MISSING"
                 result["error_stage"] = "fallback_dependency"
                 result["fallback_status"] = "dependency_missing"
+                _set_result_hint(result, exc.hint, overwrite=True)
             elif isinstance(exc, SeleniumFallbackError):
                 result["error_code"] = "DOWNLOAD_FALLBACK_PREPARE_FAILED"
                 result["error_stage"] = "fallback_prepare"
@@ -580,21 +596,25 @@ def _handle_download_failure(
                 result["error_stage"] = "fallback_retry"
                 result["fallback_status"] = "retry_failed"
             if exc.hint:
+                warning_code = _classify_hint_warning(
+                    exc.hint,
+                    default_code=(
+                        "fallback_dependency_hint"
+                        if isinstance(exc, DependencyMissingError)
+                        else "fallback_prepare_hint"
+                        if isinstance(exc, SeleniumFallbackError)
+                        else "fallback_retry_hint"
+                    ),
+                )
                 _append_warning(
                     result,
-                    code=_classify_hint_warning(
-                        exc.hint,
-                        default_code=(
-                            "fallback_dependency_hint"
-                            if isinstance(exc, DependencyMissingError)
-                            else "fallback_prepare_hint"
-                            if isinstance(exc, SeleniumFallbackError)
-                            else "fallback_retry_hint"
-                        ),
-                    ),
+                    code=warning_code,
                     message=exc.hint,
                     stage=str(result["error_stage"] or "download"),
                 )
+                if not isinstance(exc, DependencyMissingError):
+                    _apply_warning_remediation(result, warning_code, overwrite=False)
+                    _set_result_hint(result, exc.hint, overwrite=False)
         else:
             result["error"] = str(exc)
             result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
@@ -606,6 +626,7 @@ def _handle_download_failure(
                 message=str(exc),
                 stage="fallback_retry",
             )
+            _set_result_hint(result, str(exc), overwrite=False)
         return result
 
 

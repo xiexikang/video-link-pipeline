@@ -239,6 +239,7 @@ output/
 
 - `used_selenium_fallback`：是否走过浏览器兜底
 - `error_code`：下载失败分类，例如 `DOWNLOAD_PRIMARY_FAILED`、`DOWNLOAD_FALLBACK_PREPARE_FAILED`、`DOWNLOAD_FALLBACK_RETRY_FAILED`
+- `hint`：面向用户的可执行修复建议，优先复用 doctor/诊断码里的 remediation 文案
 - `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
 - `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
 - `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing`
@@ -270,6 +271,7 @@ output/
       "fallback_status": "dependency_missing",
       "error_code": "DEPENDENCY_MISSING",
       "error": "selenium fallback requested but optional dependencies are not installed",
+      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
         "install with: pip install \"video-link-pipeline[selenium]\""

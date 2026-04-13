@@ -113,6 +113,7 @@ def _write_download_manifest(
                 "fallback_context": result.get("fallback_context"),
                 "error_code": result.get("error_code") or (None if result.get("success") else "DOWNLOAD_FAILED"),
                 "error": result.get("error"),
+                "hint": result.get("hint"),
                 "warnings": list(result.get("warnings") or []),
                 "warning_details": list(result.get("warning_details") or []),
             }
@@ -135,6 +136,8 @@ def _render_download_diagnostics(result: dict[str, object]) -> None:
         log.info(f"fallback status={fallback_status}")
     if error_code:
         log.info(f"download error_code={error_code}")
+    if result.get("hint"):
+        log.info(f"download hint={result['hint']}")
     if isinstance(fallback_context, dict):
         extraction_source = fallback_context.get("extraction_source")
         media_hint_url = fallback_context.get("media_hint_url")
@@ -309,6 +312,7 @@ def download_command(
         raise VlpError(
             str(result["error"] or "download failed"),
             error_code=str(result.get("error_code") or "DOWNLOAD_FAILED"),
+            hint=str(result.get("hint") or "") or None,
         )
 
     log.success("download completed")
@@ -507,6 +511,7 @@ def run_command(
         raise VlpError(
             str(download_result["error"] or "download failed"),
             error_code=str(download_result.get("error_code") or "DOWNLOAD_FAILED"),
+            hint=str(download_result.get("hint") or "") or None,
         )
 
     job_dir = _absolute_from_root(str(download_result.get("folder")), output_root)
