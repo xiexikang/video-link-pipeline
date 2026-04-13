@@ -340,6 +340,18 @@ def _retry_with_selenium_context(
     )
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
+    warnings = list(result.get("warnings") or [])
+    warnings.append(
+        f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}"
+    )
+    result["warnings"] = warnings
+    result["fallback_context"] = {
+        "resolved_url": context.resolved_url,
+        "canonical_url": context.canonical_url,
+        "media_hint_url": context.media_hint_url,
+        "site_name": context.site_name,
+        "extraction_source": context.extraction_source,
+    }
 
     artifacts = _execute_ydl_download(preparation)
     _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
@@ -388,6 +400,8 @@ def execute_download(
         "needs_whisper": False,
         "used_selenium_fallback": False,
         "ffmpeg_path": None,
+        "warnings": [],
+        "fallback_context": None,
         "error": None,
     }
 
@@ -449,6 +463,9 @@ def _handle_download_failure(
     error_message = str(result.get("error") or "download failed")
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
         return result
+    warnings = list(result.get("warnings") or [])
+    warnings.append(f"primary download failed and triggered selenium fallback: {error_message}")
+    result["warnings"] = warnings
 
     try:
         context = run_selenium_browser_context(
@@ -465,10 +482,14 @@ def _handle_download_failure(
         )
     except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:
         result["used_selenium_fallback"] = False
+        warnings = list(result.get("warnings") or [])
         if isinstance(exc, VlpError):
             result["error"] = exc.message
+            if exc.hint:
+                warnings.append(exc.hint)
         else:
             result["error"] = str(exc)
+        result["warnings"] = warnings
         return result
 
 

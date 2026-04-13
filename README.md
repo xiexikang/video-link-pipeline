@@ -194,6 +194,16 @@ output/
 
 其中 `manifest.json` 是稳定的机器可读输出，会在 `download`、`transcribe`、`summarize`、`run` 中持续补全。
 
+当下载阶段触发 Selenium fallback 时，`manifest.json` 的 `execution.download` 里还会额外记录诊断字段：
+
+- `used_selenium_fallback`：是否走过浏览器兜底
+- `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
+- `fallback_context.resolved_url`：浏览器最终停留地址
+- `fallback_context.canonical_url`：页面 canonical 或等价主地址
+- `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
+- `fallback_context.site_name`：识别出的站点名称
+- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`
+
 ## 兼容脚本
 
 以下脚本仍然可用，但定位已经变成兼容层：
