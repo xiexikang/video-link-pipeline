@@ -13,7 +13,12 @@ from yt_dlp import YoutubeDL
 from ..errors import ConfigError, DependencyMissingError, VlpError
 from ..transcribe.ffmpeg import resolve_ffmpeg_executable
 from .cookies import CookieSource, build_cookie_options, normalize_cookie_source
-from .diagnostics import WARNING_CODES, warning_code_description, warning_code_remediation
+from .diagnostics import (
+    WARNING_CODES,
+    preferred_warning_hint,
+    warning_code_description,
+    warning_code_remediation,
+)
 from .selenium_fallback import (
     SeleniumContext,
     SeleniumFallbackError,
@@ -82,7 +87,7 @@ def _set_result_hint(result: dict[str, object], hint: str | None, *, overwrite: 
 
 
 def _apply_warning_remediation(result: dict[str, object], code: str, *, overwrite: bool = False) -> None:
-    _set_result_hint(result, warning_code_remediation(code), overwrite=overwrite)
+    _set_result_hint(result, preferred_warning_hint(code), overwrite=overwrite)
 
 
 def _classify_primary_warning(error_message: str) -> str:
@@ -586,7 +591,11 @@ def _handle_download_failure(
                 result["error_code"] = "DEPENDENCY_MISSING"
                 result["error_stage"] = "fallback_dependency"
                 result["fallback_status"] = "dependency_missing"
-                _set_result_hint(result, exc.hint, overwrite=True)
+                _set_result_hint(
+                    result,
+                    preferred_warning_hint("browser_driver_unavailable", exc.hint),
+                    overwrite=True,
+                )
             elif isinstance(exc, SeleniumFallbackError):
                 result["error_code"] = "DOWNLOAD_FALLBACK_PREPARE_FAILED"
                 result["error_stage"] = "fallback_prepare"
@@ -613,8 +622,11 @@ def _handle_download_failure(
                     stage=str(result["error_stage"] or "download"),
                 )
                 if not isinstance(exc, DependencyMissingError):
-                    _apply_warning_remediation(result, warning_code, overwrite=False)
-                    _set_result_hint(result, exc.hint, overwrite=False)
+                    _set_result_hint(
+                        result,
+                        preferred_warning_hint(warning_code, exc.hint),
+                        overwrite=False,
+                    )
         else:
             result["error"] = str(exc)
             result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
@@ -626,7 +638,11 @@ def _handle_download_failure(
                 message=str(exc),
                 stage="fallback_retry",
             )
-            _set_result_hint(result, str(exc), overwrite=False)
+            _set_result_hint(
+                result,
+                preferred_warning_hint("fallback_retry_unhandled_exception", str(exc)),
+                overwrite=False,
+            )
         return result
 
 

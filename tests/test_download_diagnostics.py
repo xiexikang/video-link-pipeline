@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from video_link_pipeline.download.diagnostics import (
+    preferred_warning_hint,
     warning_code_description,
     warning_code_remediation,
 )
@@ -20,6 +21,19 @@ def test_warning_code_description_and_remediation_for_known_code() -> None:
 def test_warning_code_lookup_returns_none_for_unknown_code() -> None:
     assert warning_code_description("unknown-warning-code") is None
     assert warning_code_remediation("unknown-warning-code") is None
+
+
+def test_preferred_warning_hint_prefers_shared_remediation() -> None:
+    hint = preferred_warning_hint("browser_driver_unavailable", "install selenium")
+
+    assert hint is not None
+    assert "Install the Selenium extra" in hint
+
+
+def test_preferred_warning_hint_falls_back_to_custom_hint() -> None:
+    hint = preferred_warning_hint("fallback_dependency_hint", "install selenium")
+
+    assert hint == "install selenium"
 
 
 def test_doctor_guidance_deduplicates_codes_and_skips_missing_metadata() -> None:
