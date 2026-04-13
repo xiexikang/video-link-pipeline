@@ -52,6 +52,7 @@ pip install -e .[dev]
 - FFmpeg 的最终选择来源和路径，例如系统 `ffmpeg` 或 `imageio-ffmpeg`
 - Selenium extra 是否完整可用
 - cookies 配置是浏览器提取还是文件路径
+- `download.selenium`、`cookies_from_browser`、`cookie_file` 的组合风险或冲突
 - 对常见 Windows 锁库、驱动缺失、FFmpeg 缺失问题的修复建议
 
 安装完成后可以先检查命令是否可用：

@@ -596,6 +596,7 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     sections = [
         ("runtime", "runtime:"),
         ("download_prerequisites", "download prerequisites:"),
+        ("config_risks", "config risks:"),
     ]
     for section_key, section_title in sections:
         section_checks = [check for check in checks if getattr(check, "section", "download_prerequisites") == section_key]

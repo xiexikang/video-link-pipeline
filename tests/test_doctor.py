@@ -75,6 +75,13 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
                 section="download_prerequisites",
                 code="ffmpeg_unavailable",
             ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_config",
+                ok=True,
+                detail="download selenium=off and no cookie source is configured",
+                section="config_risks",
+                code="primary_auth_required",
+            ),
         ],
     )
 
@@ -84,6 +91,7 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
     assert "summary provider=deepseek" in result.stdout
     assert "runtime:" in result.stdout
     assert "download prerequisites:" in result.stdout
+    assert "config risks:" in result.stdout
     assert "doctor checks passed" in result.stdout
 
 
@@ -128,6 +136,62 @@ def test_doctor_command_prints_diagnostic_guidance(monkeypatch, tmp_path: Path) 
     assert "common diagnostic guidance:" in result.stdout
     assert "ffmpeg_unavailable" in result.stdout
     assert "browser_cookie_locked" in result.stdout
+
+
+def test_run_checks_reports_conflicting_cookie_sources(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr(
+        "video_link_pipeline.doctor.importlib.util.find_spec",
+        lambda name: object() if name in {"selenium", "webdriver_manager"} else None,
+    )
+
+    checks = run_checks(
+        {
+            "download": {
+                "cookies_from_browser": "chrome",
+                "cookie_file": str(tmp_path / "cookies.txt"),
+                "selenium": "auto",
+            }
+        }
+    )
+    risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
+
+    assert risk_check.ok is False
+    assert "both cookies_from_browser and cookie_file" in risk_check.detail
+    assert "not both" in str(risk_check.hint)
+
+
+def test_run_checks_reports_selenium_off_without_cookie_source(monkeypatch) -> None:
+    monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr(
+        "video_link_pipeline.doctor.importlib.util.find_spec",
+        lambda name: object() if name in {"selenium", "webdriver_manager"} else None,
+    )
+
+    checks = run_checks({"download": {"selenium": "off"}})
+    risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
+
+    assert risk_check.ok is True
+    assert risk_check.code == "primary_auth_required"
+    assert risk_check.hint == warning_code_remediation("primary_auth_required")
+
+
+def test_run_checks_reports_selenium_on_risk(monkeypatch) -> None:
+    monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr(
+        "video_link_pipeline.doctor.importlib.util.find_spec",
+        lambda name: object() if name in {"selenium", "webdriver_manager"} else None,
+    )
+
+    checks = run_checks({"download": {"selenium": "on"}})
+    risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
+
+    assert risk_check.ok is True
+    assert risk_check.code == "browser_driver_unavailable"
+    assert risk_check.hint == warning_code_remediation("browser_driver_unavailable")
 
 
 def test_run_checks_reports_missing_cookie_file(monkeypatch, tmp_path: Path) -> None:
