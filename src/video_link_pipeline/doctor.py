@@ -40,6 +40,7 @@ def run_checks(config: dict[str, Any] | None = None) -> list[DoctorCheck]:
         _check_selenium_extra(),
     ]
     checks.extend(_check_cookie_configuration(effective_config))
+    checks.extend(_check_download_config_risks(effective_config))
     return checks
 
 
@@ -208,3 +209,54 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
             ),
         )
     ]
+
+
+def _check_download_config_risks(config: dict[str, Any]) -> list[DoctorCheck]:
+    download_config = config.get("download", {}) if isinstance(config, dict) else {}
+    browser = download_config.get("cookies_from_browser")
+    cookie_file = download_config.get("cookie_file")
+    selenium_mode = str(download_config.get("selenium") or "auto").strip().lower()
+    checks: list[DoctorCheck] = []
+
+    if browser and cookie_file:
+        checks.append(
+            DoctorCheck(
+                name="download_config",
+                ok=False,
+                detail="download config sets both cookies_from_browser and cookie_file",
+                section="config_risks",
+                hint="use either --cookies-from-browser or --cookie-file, not both",
+            )
+        )
+
+    if selenium_mode == "off" and not browser and not cookie_file:
+        checks.append(
+            DoctorCheck(
+                name="download_config",
+                ok=True,
+                detail="download selenium=off and no cookie source is configured",
+                section="config_risks",
+                code="primary_auth_required",
+                hint=preferred_warning_hint(
+                    "primary_auth_required",
+                    "sites that require login or anti-bot verification may fail without cookies or fallback",
+                ),
+            )
+        )
+
+    if selenium_mode == "on":
+        checks.append(
+            DoctorCheck(
+                name="download_config",
+                ok=True,
+                detail="download selenium=on will always attempt browser fallback after qualifying failures",
+                section="config_risks",
+                code="browser_driver_unavailable",
+                hint=preferred_warning_hint(
+                    "browser_driver_unavailable",
+                    "make sure the Selenium extra is installed and Chrome can launch normally",
+                ),
+            )
+        )
+
+    return checks
