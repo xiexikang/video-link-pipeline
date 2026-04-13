@@ -41,6 +41,18 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
                 "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
                 "selenium fallback context prepared via next-data:playAddr",
             ],
+            "warning_details": [
+                {
+                    "code": "primary_http_403",
+                    "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                    "stage": "primary_download",
+                },
+                {
+                    "code": "fallback_context_prepared",
+                    "message": "selenium fallback context prepared via next-data:playAddr",
+                    "stage": "fallback_prepare",
+                },
+            ],
             "fallback_context": {
                 "resolved_url": "https://example.com/resolved",
                 "canonical_url": "https://example.com/watch/demo",
@@ -61,6 +73,8 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
     assert download_execution["used_selenium_fallback"] is True
     assert download_execution["error_code"] is None
     assert download_execution["fallback_status"] == "succeeded"
+    assert download_execution["warning_details"][0]["code"] == "primary_http_403"
+    assert download_execution["warning_details"][1]["code"] == "fallback_context_prepared"
     assert download_execution["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
     assert download_execution["fallback_context"]["extraction_source"] == "next-data:playAddr"
     assert any("triggered selenium fallback" in item for item in download_execution["warnings"])
@@ -96,6 +110,18 @@ def test_download_cli_prints_fallback_diagnostics(monkeypatch, tmp_path: Path) -
                 "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
                 "selenium fallback context prepared via jsonld:contentUrl",
             ],
+            "warning_details": [
+                {
+                    "code": "primary_http_403",
+                    "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                    "stage": "primary_download",
+                },
+                {
+                    "code": "fallback_context_prepared",
+                    "message": "selenium fallback context prepared via jsonld:contentUrl",
+                    "stage": "fallback_prepare",
+                },
+            ],
             "fallback_context": {
                 "resolved_url": "https://example.com/resolved",
                 "canonical_url": "https://example.com/watch/demo",
@@ -114,6 +140,7 @@ def test_download_cli_prints_fallback_diagnostics(monkeypatch, tmp_path: Path) -
     assert "download used selenium fallback" in result.stdout
     assert "fallback status=triggered" in result.stdout
     assert "download error_code=DOWNLOAD_PRIMARY_FAILED" in result.stdout
+    assert "download warning[primary_http_403] stage=primary_download" in result.stdout
     assert "fallback extraction_source=jsonld:contentUrl" in result.stdout
     assert "fallback media_hint_url=https://cdn.example.com/media.m3u8" in result.stdout
 
@@ -143,6 +170,13 @@ def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path:
             "error_stage": "fallback_retry",
             "fallback_status": "retry_failed",
             "warnings": ["selenium fallback prepared but yt-dlp retry still failed"],
+            "warning_details": [
+                {
+                    "code": "fallback_retry_hint",
+                    "message": "selenium fallback prepared but yt-dlp retry still failed",
+                    "stage": "fallback_retry",
+                }
+            ],
             "fallback_context": None,
             "error": "final retry failed",
         }
@@ -154,6 +188,7 @@ def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path:
     assert result.exit_code != 0
     assert "download error_code=DOWNLOAD_FALLBACK_RETRY_FAILED" in result.stdout
     assert "fallback status=retry_failed" in result.stdout
+    assert "download warning[fallback_retry_hint] stage=fallback_retry" in result.stdout
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
     assert str(result.exception) == "final retry failed"

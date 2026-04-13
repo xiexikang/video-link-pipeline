@@ -44,6 +44,9 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert result["error_code"] == "DEPENDENCY_MISSING"
     assert result["error_stage"] == "fallback_dependency"
     assert result["fallback_status"] == "dependency_missing"
+    assert result["warning_details"][0]["code"] == "primary_http_403"
+    assert result["warning_details"][0]["description"]
+    assert result["warning_details"][1]["code"] == "fallback_dependency_hint"
     assert "optional dependencies are not installed" in str(result["error"])
 
 
@@ -92,6 +95,7 @@ def test_execute_download_marks_used_selenium_fallback(monkeypatch, tmp_path: Pa
     assert result["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
     assert result["error_stage"] == "fallback_retry"
     assert result["fallback_status"] == "retry_failed"
+    assert result["warning_details"][0]["code"] == "primary_captcha_required"
     assert "retry failed" in str(result["error"])
 
 
@@ -220,7 +224,90 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
     assert result["used_selenium_fallback"] is True
     assert result["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
     assert result["fallback_context"]["extraction_source"] == "jsonld:contentUrl"
+    assert result["warning_details"][0]["code"] == "fallback_context_prepared"
+    assert result["warning_details"][0]["description"]
     assert any("selenium fallback context prepared" in item for item in result["warnings"])
+
+
+def test_retry_with_selenium_context_marks_missing_explicit_media_hint(monkeypatch, tmp_path: Path) -> None:
+    class FakePreparation:
+        def __init__(self) -> None:
+            self.output_root = tmp_path
+            self.output_dir = tmp_path / "job"
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self.title_hint = "demo"
+            self.ffmpeg_path = "ffmpeg"
+            self.url = "https://example.com/watch/demo"
+            self.ydl_options = {}
+
+    monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._execute_ydl_download",
+        lambda preparation: {
+            "video": "video.mp4",
+            "audio_mp3": None,
+            "audio_m4a": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info_json": None,
+        },
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._validate_downloaded_files",
+        lambda *args, **kwargs: None,
+    )
+
+    result = _retry_with_selenium_context(
+        context=SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="mobile-ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="page description",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="dom",
+        ),
+        output_dir=tmp_path,
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        result={"success": False, "url": "https://example.com/video", "subtitle": None},
+    )
+
+    codes = [item["code"] for item in result["warning_details"]]
+    assert "fallback_context_prepared" in codes
+    assert "fallback_media_hint_missing" in codes
+
+
+def test_execute_download_classifies_cookie_lock_warning(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service.probe_download",
+        lambda **_: (_ for _ in ()).throw(
+            Exception("could not copy database because the browser cookie database is locked")
+        ),
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service.run_selenium_browser_context",
+        lambda **_: (_ for _ in ()).throw(
+            __import__("video_link_pipeline.errors", fromlist=["DependencyMissingError"]).DependencyMissingError(
+                "selenium fallback requested but optional dependencies are not installed",
+                hint="could not copy database because the browser cookie database is locked",
+            )
+        ),
+    )
+
+    result = execute_download(
+        url="https://example.com/video",
+        output_dir=tmp_path,
+        selenium_mode="auto",
+    )
+
+    codes = [item["code"] for item in result["warning_details"]]
+    assert "browser_cookie_locked" in codes
 
 
 def test_choose_best_media_hint_prefers_streamable_urls() -> None:
