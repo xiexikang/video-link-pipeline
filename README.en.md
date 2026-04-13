@@ -1,185 +1,215 @@
-# video-link-pipeline 
+# video-link-pipeline
 
-This is a complete toolset integrating video downloading, audio extraction, subtitle processing, speech transcription, and AI summarization. It aims to help users quickly acquire content from major video platforms and perform in-depth processing using AI technology.
+`video-link-pipeline` is a local CLI toolchain for video downloading, transcription, summarization, and subtitle conversion.
 
-## ✨ Key Features
+This repository is being migrated from a collection of standalone scripts to a publishable Python package with a unified CLI. The recommended entry point is now `vlp`. Legacy scripts such as `download_video.py`, `parallel_transcribe.py`, `generate_summary.py`, and `convert_subtitle.py` are still kept as compatibility wrappers.
 
-*   **All-in-One Download**: Supports video/audio/subtitle downloading from multiple platforms like YouTube, Bilibili, TikTok, Kuaishou, etc. (based on `yt-dlp`).
-    *   **Powerful Anti-Crawling**: Built-in Selenium mobile emulation and anti-detection mechanisms to effectively counter anti-crawling strategies of platforms like Kuaishou, automatically attempting direct link downloads.
-    *   **Cookies Support**: Supports automatically invoking browser Cookies (Chrome, Edge, Firefox, etc.) or loading Netscape format Cookies files to solve member/login restrictions.
-    *   **Audio Only Mode**: Supports downloading only audio and automatically converting it to MP3.
-*   **Smart Transcription**: Uses `faster-whisper` (default) or `openai-whisper` for local speech transcription.
-    *   **Multi-Model Support**: Supports models of all sizes from tiny to large-v3.
-    *   **High Performance**: Supports GPU acceleration (CUDA) and INT8/Float16 quantization inference.
-    *   **Auto Environment**: Built-in FFmpeg environment automatic configuration function, no need for tedious manual installation.
-*   **AI Summary**: Integrates multiple mainstream large model APIs to generate structured intelligent summaries of video content with one click.
-    *   **Multi-Model Support**: Claude 3.5, GPT-4o, Gemini 1.5, DeepSeek V3, Kimi, MiniMax, Zhipu GLM-4, etc.
-    *   **Structured Output**: Generates Markdown reports and JSON data containing a one-sentence summary, core points, key segments, and tags.
-*   **Subtitle Tools**: Provides conversion tools between SRT and VTT subtitle formats, supporting batch processing.
-*   **Highly Configurable**: Flexibly configure various parameters via `config.yaml`.
+## Current Commands
 
-## 🛠️ Prerequisites
+- `vlp download <url>`: download video, audio, and subtitles into a normalized job folder
+- `vlp transcribe <path>`: run Whisper transcription and write `transcript.txt`, `subtitle_whisper.srt`, and `subtitle_whisper.vtt`
+- `vlp summarize <transcript.txt>`: generate `summary.md` and `keywords.json`
+- `vlp convert-subtitle <file-or-dir>`: convert between `srt` and `vtt`
+- `vlp run <url>`: orchestrate download, transcription, and summary while updating `manifest.json`
+- `vlp doctor`: inspect Python, FFmpeg, Selenium extra, and cookies-related setup
 
-Before starting, please ensure your system has installed:
+## Installation
 
-*   **Python 3.8+**
-*   **FFmpeg**: 
-    *   The project has built-in automatic detection and configuration of FFmpeg. If not installed on the system, the script will automatically try to use `imageio-ffmpeg` or configure the local `bin` directory.
-    *   Of course, you can also manually install and add it to the environment variables for the best experience.
+Requirements:
 
-## 🚀 Quick Install
+- Python 3.10+
+- Windows, Linux, and macOS are supported, with Windows being the primary focus right now
 
-1.  **Clone Project**
-    ```bash
-    git clone <repository_url>
-    cd skill-video-extract
-    ```
-
-2.  **Install Dependencies**
-    
-    *   **Windows**:
-        ```bash
-        pip install -r requirements.txt
-        # To use Selenium powerful anti-crawling features (recommended), please install additionally:
-        pip install selenium webdriver_manager
-        ```
-    *   **Linux / macOS**:
-        ```bash
-        chmod +x scripts/install_deps.sh
-        ./scripts/install_deps.sh
-        ```
-
-3.  **Configuration**
-    Ensure `config.yaml` exists and modify it as needed (default configuration is in the project root directory):
-    ```yaml
-    # config.yaml example
-    output_dir: ./output
-    
-    whisper:
-      model: small
-      device: auto # auto, cuda, cpu
-      compute_type: int8 # int8, float16
-    
-    summary:
-      provider: claude # Supports claude, openai, gemini, deepseek, kimi, minimax, glm
-      model: claude-3-5-sonnet-20241022
-      api_keys:
-        claude: "sk-..." 
-        openai: "sk-..."
-        # Or use environment variables ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.
-    
-    download:
-      cookies_from_browser: chrome # Default browser Cookies to use
-    ```
-
-## 📖 Usage Guide
-
-### 1. Download Video (download_video.py)
-
-Download video, audio, and subtitles from URL. Supports automatic handling of anti-crawling redirects.
+Recommended installation:
 
 ```bash
-# Basic usage
-python download_video.py "https://www.bilibili.com/video/BV1..."
-
-# Specify output directory and languages
-python download_video.py "https://..." --output-dir ./my_videos --lang zh en
-
-# Download audio only (save as MP3)
-python download_video.py "https://..." --audio-only
-
-# Use browser Cookies (solve member/login restrictions)
-# Supports: chrome, edge, firefox, opera, brave, vivaldi
-python download_video.py "https://..." --cookies chrome
-
-# Use Cookies file (Netscape format)
-python download_video.py "https://..." --cookies cookies.txt
+git clone <repository_url>
+cd video-link-pipeline
+pip install -e .
 ```
 
-### 2. Speech Transcription (parallel_transcribe.py)
-
-Transcribe audio/video files to text/subtitles using Whisper models.
+To enable Selenium fallback support:
 
 ```bash
-# Basic transcription (uses faster-whisper, small model by default)
-python parallel_transcribe.py --input "./output/video/video.mp4"
-
-# Specify model size and language
-python parallel_transcribe.py -i "./video.mp4" --model large-v3 --language zh
-
-# Use GPU acceleration (requires CUDA version of PyTorch)
-python parallel_transcribe.py -i "./video.mp4" --device cuda --compute-type float16
-
-# Switch transcription engine
-# faster_whisper (recommended, fast) | openai_whisper (original, good compatibility)
-python parallel_transcribe.py -i "./video.mp4" --engine openai_whisper
-
-# Batch transcription (input directory)
-python parallel_transcribe.py -i "./output/videos_folder"
+pip install -e .[selenium]
 ```
 
-### 3. AI Summary Generation (generate_summary.py)
-
-Generate intelligent summaries of transcribed content using LLMs.
-
-**Supported Model Providers**:
-*   `claude` (Anthropic Claude 3.5 Sonnet, etc.)
-*   `openai` (GPT-4o, GPT-3.5, etc.)
-*   `gemini` (Google Gemini 1.5 Flash/Pro)
-*   `deepseek` (DeepSeek V3/R1)
-*   `kimi` / `moonshot` (Moonshot AI)
-*   `minimax` (MiniMax)
-*   `glm` / `zhipu` (Zhipu AI GLM-4)
-
-**Configuration**:
-Set `provider` and corresponding `api_keys` in `config.yaml`, or create a `.env` file in the project root (or set environment variables) to configure API Keys (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, etc.).
-
-**Output Content**:
-1.  **Markdown Summary Report** (`summary.md`): Contains one-sentence summary, core points, key segments, topic tags, and overall evaluation.
-2.  **Structured JSON Data** (`keywords.json`): Contains structured fields for easy programmatic processing.
+To install development dependencies:
 
 ```bash
-# Basic usage (uses configuration in config.yaml)
-python generate_summary.py --transcript "./output/video/transcript.txt"
-
-# Temporarily specify model provider and API Key
-python generate_summary.py -t "transcript.txt" --provider openai --model gpt-4o --api-key "sk-..."
-
-# Use DeepSeek
-python generate_summary.py -t "transcript.txt" --provider deepseek --api-key "sk-..."
-
-# Output full JSON result to terminal
-python generate_summary.py -t "transcript.txt" --json
+pip install -e .[dev]
 ```
 
-### 4. Subtitle Conversion (convert_subtitle.py)
-
-Convert between SRT and VTT formats.
+Quick verification:
 
 ```bash
-# Single file conversion (automatically detects source format and converts reversely)
-python convert_subtitle.py --input "sub.vtt"
-
-# Specify output format
-python convert_subtitle.py --input "sub.vtt" --format srt
-
-# Batch convert all subtitle files in a directory
-python convert_subtitle.py --input "./subs_dir" --batch --format srt
+vlp --help
+vlp doctor
 ```
 
-## 📂 Project Structure
+## Configuration
 
-```
-.
-├── download_video.py       # Video download main program (integrates Selenium/yt-dlp)
-├── parallel_transcribe.py  # Speech transcription main program (Faster-Whisper/OpenAI-Whisper)
-├── generate_summary.py     # AI summary generation program (multi-model support)
-├── convert_subtitle.py     # Subtitle format conversion tool
-├── config.yaml             # Configuration file
-├── requirements.txt        # Python dependencies
-└── scripts/                # Helper scripts
+The default config file is `config.yaml` in the repository root.
+
+Configuration precedence:
+
+1. CLI arguments
+2. Environment variables and `.env`
+3. `config.yaml`
+4. Built-in defaults
+
+Example config:
+
+```yaml
+output_dir: ./output
+temp_dir: ./temp
+
+download:
+  quality: best
+  format: mp4
+  subtitles_langs: [zh, en]
+  write_subtitles: true
+  write_auto_subs: true
+  cookies_from_browser: null
+  cookie_file: null
+  selenium: auto
+
+whisper:
+  model: small
+  engine: auto
+  language: auto
+  device: auto
+  compute_type: int8
+
+summary:
+  enabled: true
+  provider: claude
+  model: claude-3-5-sonnet-20241022
+  base_url: null
+  max_tokens: 4096
+  temperature: 0.3
+
+api_keys:
+  claude: null
+  openai: null
+  gemini: null
+  deepseek: null
+  kimi: null
+  moonshot: null
+  minimax: null
+  glm: null
+  zhipu: null
 ```
 
-## 📄 License
+Common environment variables:
+
+```bash
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+GEMINI_API_KEY=...
+DEEPSEEK_API_KEY=...
+VLP_OUTPUT_DIR=./output
+VLP_DOWNLOAD_COOKIES_FROM_BROWSER=chrome
+VLP_WHISPER_MODEL=small
+VLP_SUMMARY_PROVIDER=claude
+```
+
+Notes:
+
+- Legacy `summary.api_keys.*` is still read for compatibility, but it now emits a migration warning
+- `vlp doctor` reports the selected FFmpeg source and highlights Selenium/cookies issues
+
+## Usage
+
+### Download
+
+```bash
+vlp download "https://www.bilibili.com/video/BV..."
+vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
+vlp download "https://..." --audio-only
+vlp download "https://..." --cookies-from-browser chrome
+vlp download "https://..." --cookie-file ./cookies.txt
+```
+
+### Transcribe
+
+```bash
+vlp transcribe ./output/demo/video.mp4
+vlp transcribe ./output/demo --model small --language auto
+vlp transcribe ./output/demo/video.mp4 --engine faster --device cpu --compute-type int8
+```
+
+### Summarize
+
+```bash
+vlp summarize ./output/demo/transcript.txt --provider claude
+vlp summarize ./output/demo/transcript.txt --provider deepseek --base-url https://api.deepseek.com --model deepseek-chat
+```
+
+### Convert subtitles
+
+```bash
+vlp convert-subtitle ./subtitle.vtt --format srt
+vlp convert-subtitle ./subs --batch --format srt
+```
+
+### Run the pipeline
+
+```bash
+vlp run "https://..."
+vlp run "https://..." --do-transcribe
+vlp run "https://..." --do-transcribe --do-summary
+```
+
+### Doctor
+
+```bash
+vlp doctor
+vlp doctor --config ./config.yaml
+```
+
+## Output Contract
+
+`output_dir` is the output root. Each task writes into its own job directory.
+
+A typical output tree looks like this:
+
+```text
+output/
+└─ BVxxxx-demo-title/
+   ├─ video.mp4
+   ├─ audio.m4a
+   ├─ subtitle.vtt
+   ├─ subtitle.srt
+   ├─ transcript.txt
+   ├─ subtitle_whisper.srt
+   ├─ subtitle_whisper.vtt
+   ├─ transcript.json
+   ├─ summary.md
+   ├─ keywords.json
+   └─ manifest.json
+```
+
+`manifest.json` is the stable machine-readable output and is incrementally updated by `download`, `transcribe`, `summarize`, and `run`.
+
+## Compatibility Wrappers
+
+These script entry points are still available:
+
+- `python download_video.py ...`
+- `python parallel_transcribe.py ...`
+- `python generate_summary.py ...`
+- `python convert_subtitle.py ...`
+
+New usage should prefer `vlp`. The wrapper scripts now act as compatibility layers over the package implementation and are no longer the long-term primary interface.
+
+## Current Status
+
+- `vlp run` and `vlp doctor` are implemented
+- Basic tests and a Windows CI workflow have been added
+- If `pytest` is not installed in the local environment, tests cannot be executed directly
+- Selenium fallback is still being refined; `doctor` currently focuses on install and diagnosis guidance
+
+## License
 
 MIT License
