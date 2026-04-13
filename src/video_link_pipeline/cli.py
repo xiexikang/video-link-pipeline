@@ -9,6 +9,7 @@ import typer
 
 from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
+from .doctor import run_checks
 from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
 from .manifest import upsert_manifest
@@ -192,6 +193,30 @@ def _write_summary_manifest(
         },
     )
     return manifest_path
+
+
+def _find_existing_transcript(job_dir: Path) -> Path | None:
+    transcript_path = job_dir / "transcript.txt"
+    if transcript_path.exists():
+        return transcript_path
+    matches = sorted(job_dir.glob("**/transcript.txt"))
+    return matches[0] if matches else None
+
+
+def _finalize_run_manifest(
+    manifest_path: Path | None,
+    *,
+    effective_config: dict[str, Any],
+    url: str,
+) -> None:
+    if manifest_path is None:
+        return
+    upsert_manifest(
+        manifest_path,
+        command="vlp run",
+        input_data={"url": url, "input_path": None},
+        config_effective=redact_config(effective_config),
+    )
 
 
 @app.command("download")
@@ -389,23 +414,141 @@ def run_command(
     url: str,
     do_transcribe: bool = typer.Option(False, "--do-transcribe", help="Run transcription step."),
     do_summary: bool = typer.Option(False, "--do-summary", help="Run summary step."),
+    output_dir: Path | None = typer.Option(None, "--output-dir", help="Output root directory."),
+    sub_lang: list[str] | None = typer.Option(None, "--sub-lang", help="Subtitle languages."),
+    quality: str | None = typer.Option(None, "--quality", help="yt-dlp format selector."),
+    cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
+    cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    bundle = _command_context(config)
-    _render_placeholder(
-        "run",
-        bundle,
-        f"url={url} do_transcribe={do_transcribe} do_summary={do_summary}",
+    overrides = {
+        "output_dir": str(output_dir) if output_dir else None,
+        "download": {
+            "subtitles_langs": sub_lang,
+            "quality": quality,
+            "cookie_file": str(cookie_file) if cookie_file else None,
+            "cookies_from_browser": cookies_from_browser,
+        },
+    }
+    bundle = _command_context(config, overrides)
+    effective = bundle.effective_config
+    download_config = effective["download"]
+    whisper_config = effective["whisper"]
+    output_root = Path(effective["output_dir"])
+
+    log.info(f"loaded configuration from {bundle.source_path or 'defaults/.env/environment'}")
+    log.info(f"output_dir={effective['output_dir']}")
+
+    download_result = execute_download(
+        url=url,
+        output_dir=effective["output_dir"],
+        languages=download_config["subtitles_langs"],
+        quality=download_config["quality"],
+        audio_only=False,
+        cookies_from_browser=download_config.get("cookies_from_browser"),
+        cookie_file=download_config.get("cookie_file"),
     )
+    manifest_path = _write_download_manifest(
+        result=download_result,
+        effective_config=effective,
+        output_root=output_root,
+        url=url,
+        audio_only=False,
+    )
+    if not download_result["success"]:
+        raise VlpError(str(download_result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
+
+    job_dir = _absolute_from_root(str(download_result.get("folder")), output_root)
+    if job_dir is None:
+        raise VlpError("download succeeded but output folder could not be resolved")
+
+    log.success("download completed")
+    log.info(f"folder={download_result['folder']}")
+
+    transcript_path = _find_existing_transcript(job_dir)
+    should_transcribe = bool(download_result.get("needs_whisper")) or do_transcribe or (do_summary and transcript_path is None)
+
+    if should_transcribe:
+        transcribe_result = transcribe_path(
+            input_path=job_dir,
+            output_dir=None,
+            model_size=whisper_config["model"],
+            language=whisper_config["language"],
+            device=whisper_config["device"],
+            compute_type=whisper_config["compute_type"],
+            engine=whisper_config["engine"],
+        )
+        manifest_path = _write_transcribe_manifest(
+            result=transcribe_result,
+            effective_config=effective,
+            output_root=output_root,
+            input_path=job_dir,
+        ) or manifest_path
+        if not transcribe_result["success"]:
+            raise VlpError(
+                str(transcribe_result["error"] or "transcription failed"),
+                error_code="TRANSCRIBE_FAILED",
+            )
+        transcript_path = Path(str(transcribe_result["transcript_file"]))
+        log.success("transcription completed")
+        log.info(f"transcript={transcribe_result['transcript_file']}")
+    elif transcript_path is not None:
+        log.info(f"reusing existing transcript={transcript_path}")
+
+    if do_summary:
+        if transcript_path is None or not transcript_path.exists():
+            raise VlpError(
+                "summary step requires transcript.txt but no transcript was found",
+                error_code="INPUT_NOT_FOUND",
+            )
+        summary_result = summarize_transcript(
+            transcript_path=transcript_path,
+            output_dir=None,
+            config=effective,
+        )
+        manifest_path = _write_summary_manifest(
+            result=summary_result,
+            effective_config=effective,
+            output_root=output_root,
+            transcript_path=transcript_path,
+        ) or manifest_path
+        if not summary_result["success"]:
+            raise VlpError(
+                str(summary_result["error"] or "summary generation failed"),
+                error_code="SUMMARY_FAILED",
+            )
+        log.success("summary completed")
+        log.info(f"summary={summary_result['summary_file']}")
+
+    _finalize_run_manifest(manifest_path, effective_config=effective, url=url)
+    log.success("pipeline completed")
+    if manifest_path is not None:
+        log.info(f"manifest={manifest_path}")
 
 
 @app.command("doctor")
 def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML.")) -> None:
     bundle = _command_context(config)
     redacted = redact_config(bundle.effective_config)
-    log.info("doctor command is not implemented yet.")
     log.info(f"config source={bundle.source_path or 'defaults/.env/environment'}")
+    log.info(f"output_dir={redacted['output_dir']}")
     log.info(f"summary provider={redacted['summary']['provider']}")
+    checks = run_checks(bundle.effective_config)
+
+    has_failures = False
+    for check in checks:
+        if check.ok:
+            log.success(f"{check.name}: {check.detail}")
+        else:
+            has_failures = True
+            log.warning(f"{check.name}: {check.detail}")
+        if check.hint:
+            log.info(f"hint: {check.hint}")
+
+    if has_failures:
+        log.warning("doctor found items that may block some workflows")
+    else:
+        log.success("doctor checks passed")
 
 
 def main() -> int:
