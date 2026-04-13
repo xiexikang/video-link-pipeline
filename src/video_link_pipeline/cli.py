@@ -109,13 +109,30 @@ def _write_download_manifest(
             "download": {
                 "success": bool(result.get("success")),
                 "used_selenium_fallback": bool(result.get("used_selenium_fallback", False)),
+                "fallback_context": result.get("fallback_context"),
                 "error_code": None if result.get("success") else "DOWNLOAD_FAILED",
                 "error": result.get("error"),
-                "warnings": [],
+                "warnings": list(result.get("warnings") or []),
             }
         },
     )
     return manifest_path
+
+
+def _render_download_diagnostics(result: dict[str, object]) -> None:
+    warnings = [str(item) for item in list(result.get("warnings") or []) if item]
+    fallback_context = result.get("fallback_context")
+    if bool(result.get("used_selenium_fallback")):
+        log.warning("download used selenium fallback")
+    if isinstance(fallback_context, dict):
+        extraction_source = fallback_context.get("extraction_source")
+        media_hint_url = fallback_context.get("media_hint_url")
+        if extraction_source:
+            log.info(f"fallback extraction_source={extraction_source}")
+        if media_hint_url:
+            log.info(f"fallback media_hint_url={media_hint_url}")
+    for warning in warnings[:3]:
+        log.info(f"download warning: {warning}")
 
 
 def _write_transcribe_manifest(
@@ -266,6 +283,7 @@ def download_command(
         url=url,
         audio_only=audio_only,
     )
+    _render_download_diagnostics(result)
 
     if not result["success"]:
         raise VlpError(str(result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
@@ -461,6 +479,7 @@ def run_command(
         url=url,
         audio_only=False,
     )
+    _render_download_diagnostics(download_result)
     if not download_result["success"]:
         raise VlpError(str(download_result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
 

@@ -194,6 +194,16 @@ output/
 
 `manifest.json` is the stable machine-readable output and is incrementally updated by `download`, `transcribe`, `summarize`, and `run`.
 
+When Selenium fallback is triggered during download, `execution.download` also carries extra diagnostics:
+
+- `used_selenium_fallback`: whether browser fallback was used
+- `warnings`: trigger reason, dependency hints, and context-preparation notes
+- `fallback_context.resolved_url`: the final browser URL
+- `fallback_context.canonical_url`: the canonical page URL when available
+- `fallback_context.media_hint_url`: the preferred media URL extracted from page signals
+- `fallback_context.site_name`: the detected site name
+- `fallback_context.extraction_source`: where the media hint came from, such as `next-data:playAddr` or `jsonld:contentUrl`
+
 ## Compatibility Wrappers
 
 These script entry points are still available:

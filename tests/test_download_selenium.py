@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from video_link_pipeline.download.selenium_fallback import SeleniumContext, should_attempt_selenium_fallback
+from video_link_pipeline.download.selenium_fallback import (
+    SeleniumContext,
+    choose_best_media_hint,
+    extract_page_signals_from_html,
+    should_attempt_selenium_fallback,
+)
 from video_link_pipeline.download.service import _origin_from_url, _retry_with_selenium_context, execute_download
 
 
@@ -57,6 +62,7 @@ def test_execute_download_marks_used_selenium_fallback(monkeypatch, tmp_path: Pa
             canonical_url="https://example.com/watch/demo",
             media_hint_url="https://example.com/media.m3u8",
             site_name="example.com",
+            extraction_source="meta:og:video",
         ),
     )
     monkeypatch.setattr(
@@ -98,6 +104,7 @@ def test_execute_download_can_succeed_after_selenium_retry(monkeypatch, tmp_path
             canonical_url="https://example.com/watch/demo",
             media_hint_url="https://example.com/media.m3u8",
             site_name="example.com",
+            extraction_source="meta:og:video",
         ),
     )
     monkeypatch.setattr(
@@ -181,6 +188,7 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
             canonical_url="https://example.com/watch/demo",
             media_hint_url="https://cdn.example.com/media.m3u8",
             site_name="example.com",
+            extraction_source="jsonld:contentUrl",
         ),
         output_dir=tmp_path,
         languages=["zh"],
@@ -197,3 +205,46 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
     assert headers["Origin"] == "https://example.com"
     assert result["success"] is True
     assert result["used_selenium_fallback"] is True
+    assert result["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
+    assert result["fallback_context"]["extraction_source"] == "jsonld:contentUrl"
+    assert any("selenium fallback context prepared" in item for item in result["warnings"])
+
+
+def test_choose_best_media_hint_prefers_streamable_urls() -> None:
+    url, source = choose_best_media_hint(
+        [
+            {"url": "https://example.com/video.mp4", "source": "jsonld"},
+            {"url": "https://example.com/master.m3u8", "source": "next-data"},
+            {"url": "https://example.com/dash.mpd", "source": "inline-script"},
+        ]
+    )
+
+    assert url == "https://example.com/master.m3u8"
+    assert source == "next-data"
+
+
+def test_extract_page_signals_from_html_reads_jsonld_and_next_data() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+          {"@context":"https://schema.org","contentUrl":"https://cdn.example.com/from-jsonld.mp4"}
+        </script>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"video":{"playAddr":"https://cdn.example.com/from-next-data.m3u8"}}}}
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/123",
+        canonical_url="https://example.com/watch/123",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-next-data.m3u8"
+    assert signals["extraction_source"] == "next-data:playAddr"
