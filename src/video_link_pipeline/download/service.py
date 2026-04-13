@@ -13,6 +13,7 @@ from yt_dlp import YoutubeDL
 from ..errors import ConfigError, DependencyMissingError, VlpError
 from ..transcribe.ffmpeg import resolve_ffmpeg_executable
 from .cookies import CookieSource, build_cookie_options, normalize_cookie_source
+from .diagnostics import WARNING_CODES, warning_code_description
 from .selenium_fallback import (
     SeleniumContext,
     SeleniumFallbackError,
@@ -39,6 +40,60 @@ class DownloadError(VlpError):
 
     def __init__(self, message: str, hint: str | None = None) -> None:
         super().__init__(message=message, error_code="DOWNLOAD_FAILED", hint=hint)
+
+
+def _warning_details(result: dict[str, object]) -> list[dict[str, str]]:
+    details = result.get("warning_details")
+    if not isinstance(details, list):
+        details = []
+        result["warning_details"] = details
+    return details
+
+
+def _append_warning(
+    result: dict[str, object],
+    *,
+    code: str,
+    message: str,
+    stage: str,
+) -> None:
+    if code not in WARNING_CODES:
+        raise ValueError(f"unknown download warning code: {code}")
+    warnings = list(result.get("warnings") or [])
+    warnings.append(message)
+    result["warnings"] = warnings
+    _warning_details(result).append(
+        {
+            "code": code,
+            "message": message,
+            "stage": stage,
+            "description": warning_code_description(code) or "",
+        }
+    )
+
+
+def _classify_primary_warning(error_message: str) -> str:
+    lowered = error_message.lower()
+    if "403" in lowered or "forbidden" in lowered:
+        return "primary_http_403"
+    if "captcha" in lowered or "verify you are human" in lowered or "verification" in lowered:
+        return "primary_captcha_required"
+    if "cookie" in lowered and ("database" in lowered or "locked" in lowered or "copy" in lowered):
+        return "browser_cookie_locked"
+    if "sign in" in lowered or "login required" in lowered:
+        return "primary_auth_required"
+    return "primary_download_failed"
+
+
+def _classify_hint_warning(hint: str, *, default_code: str) -> str:
+    lowered = hint.lower()
+    if "could not copy database" in lowered or "database is locked" in lowered or "locked" in lowered:
+        return "browser_cookie_locked"
+    if "chromedriver" in lowered or "webdriver" in lowered:
+        return "browser_driver_unavailable"
+    if "ffmpeg" in lowered:
+        return "ffmpeg_unavailable"
+    return default_code
 
 
 def sanitize_filename(filename: str) -> str:
@@ -343,10 +398,22 @@ def _retry_with_selenium_context(
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
     warnings = list(result.get("warnings") or [])
-    warnings.append(
-        f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}"
+    _append_warning(
+        result,
+        code="fallback_context_prepared",
+        message=f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}",
+        stage="fallback_prepare",
     )
-    result["warnings"] = warnings
+    if not context.media_hint_url or context.media_hint_url in {
+        context.resolved_url,
+        context.canonical_url,
+    }:
+        _append_warning(
+            result,
+            code="fallback_media_hint_missing",
+            message="selenium fallback did not extract an explicit media URL and will retry with the resolved page URL",
+            stage="fallback_prepare",
+        )
     result["fallback_context"] = {
         "resolved_url": context.resolved_url,
         "canonical_url": context.canonical_url,
@@ -408,6 +475,7 @@ def execute_download(
         "error_stage": None,
         "fallback_status": "not_attempted",
         "warnings": [],
+        "warning_details": [],
         "fallback_context": None,
         "error": None,
     }
@@ -475,9 +543,12 @@ def _handle_download_failure(
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
         return result
     result["fallback_status"] = "triggered"
-    warnings = list(result.get("warnings") or [])
-    warnings.append(f"primary download failed and triggered selenium fallback: {error_message}")
-    result["warnings"] = warnings
+    _append_warning(
+        result,
+        code=_classify_primary_warning(error_message),
+        message=f"primary download failed and triggered selenium fallback: {error_message}",
+        stage="primary_download",
+    )
 
     try:
         context = run_selenium_browser_context(
@@ -494,7 +565,6 @@ def _handle_download_failure(
         )
     except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:
         result["used_selenium_fallback"] = False
-        warnings = list(result.get("warnings") or [])
         if isinstance(exc, VlpError):
             result["error"] = exc.message
             if isinstance(exc, DependencyMissingError):
@@ -510,13 +580,32 @@ def _handle_download_failure(
                 result["error_stage"] = "fallback_retry"
                 result["fallback_status"] = "retry_failed"
             if exc.hint:
-                warnings.append(exc.hint)
+                _append_warning(
+                    result,
+                    code=_classify_hint_warning(
+                        exc.hint,
+                        default_code=(
+                            "fallback_dependency_hint"
+                            if isinstance(exc, DependencyMissingError)
+                            else "fallback_prepare_hint"
+                            if isinstance(exc, SeleniumFallbackError)
+                            else "fallback_retry_hint"
+                        ),
+                    ),
+                    message=exc.hint,
+                    stage=str(result["error_stage"] or "download"),
+                )
         else:
             result["error"] = str(exc)
             result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
             result["error_stage"] = "fallback_retry"
             result["fallback_status"] = "retry_failed"
-        result["warnings"] = warnings
+            _append_warning(
+                result,
+                code="fallback_retry_unhandled_exception",
+                message=str(exc),
+                stage="fallback_retry",
+            )
         return result
 
 

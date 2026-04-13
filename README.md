@@ -200,11 +200,23 @@ output/
 - `error_code`：下载失败分类，例如 `DOWNLOAD_PRIMARY_FAILED`、`DOWNLOAD_FALLBACK_PREPARE_FAILED`、`DOWNLOAD_FALLBACK_RETRY_FAILED`
 - `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
 - `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
+- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing`
 - `fallback_context.resolved_url`：浏览器最终停留地址
 - `fallback_context.canonical_url`：页面 canonical 或等价主地址
 - `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
 - `fallback_context.site_name`：识别出的站点名称
 - `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`
+
+常见 `warning_details.code` 对照：
+
+- `primary_http_403`：主下载遇到 403/Forbidden，通常是反爬、鉴权或区域限制
+- `primary_captcha_required`：主下载命中验证码或人机校验
+- `primary_auth_required`：主下载需要登录或账号权限
+- `browser_cookie_locked`：浏览器 cookies 数据库被占用、锁定或无法复制
+- `browser_driver_unavailable`：Selenium 浏览器驱动不可用
+- `fallback_context_prepared`：fallback 已成功提取浏览器上下文
+- `fallback_media_hint_missing`：未提取到明确媒体地址，只能用页面地址重试
+- `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
 
 ## 兼容脚本
 

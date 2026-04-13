@@ -114,6 +114,7 @@ def _write_download_manifest(
                 "error_code": result.get("error_code") or (None if result.get("success") else "DOWNLOAD_FAILED"),
                 "error": result.get("error"),
                 "warnings": list(result.get("warnings") or []),
+                "warning_details": list(result.get("warning_details") or []),
             }
         },
     )
@@ -122,6 +123,9 @@ def _write_download_manifest(
 
 def _render_download_diagnostics(result: dict[str, object]) -> None:
     warnings = [str(item) for item in list(result.get("warnings") or []) if item]
+    warning_details = [
+        item for item in list(result.get("warning_details") or []) if isinstance(item, dict)
+    ]
     fallback_context = result.get("fallback_context")
     fallback_status = result.get("fallback_status")
     error_code = result.get("error_code")
@@ -138,8 +142,17 @@ def _render_download_diagnostics(result: dict[str, object]) -> None:
             log.info(f"fallback extraction_source={extraction_source}")
         if media_hint_url:
             log.info(f"fallback media_hint_url={media_hint_url}")
-    for warning in warnings[:3]:
-        log.info(f"download warning: {warning}")
+    if warning_details:
+        for item in warning_details[:3]:
+            code = item.get("code")
+            message = item.get("message")
+            stage = item.get("stage")
+            if code and message:
+                suffix = f" stage={stage}" if stage else ""
+                log.info(f"download warning[{code}]{suffix}: {message}")
+    else:
+        for warning in warnings[:3]:
+            log.info(f"download warning: {warning}")
 
 
 def _write_transcribe_manifest(

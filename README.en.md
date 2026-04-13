@@ -200,11 +200,23 @@ When Selenium fallback is triggered during download, `execution.download` also c
 - `error_code`: categorized download failure code, such as `DOWNLOAD_PRIMARY_FAILED`, `DOWNLOAD_FALLBACK_PREPARE_FAILED`, or `DOWNLOAD_FALLBACK_RETRY_FAILED`
 - `fallback_status`: fallback lifecycle status, such as `triggered`, `dependency_missing`, `prepare_failed`, `retry_failed`, or `succeeded`
 - `warnings`: trigger reason, dependency hints, and context-preparation notes
+- `warning_details`: structured warning records with `code`, `message`, and `stage`, useful for batch analytics, for example `primary_http_403`, `browser_cookie_locked`, or `fallback_media_hint_missing`
 - `fallback_context.resolved_url`: the final browser URL
 - `fallback_context.canonical_url`: the canonical page URL when available
 - `fallback_context.media_hint_url`: the preferred media URL extracted from page signals
 - `fallback_context.site_name`: the detected site name
 - `fallback_context.extraction_source`: where the media hint came from, such as `next-data:playAddr` or `jsonld:contentUrl`
+
+Common `warning_details.code` values:
+
+- `primary_http_403`: the primary download hit a 403/Forbidden, usually anti-bot, auth, or geo restriction
+- `primary_captcha_required`: the primary download hit a captcha or human verification page
+- `primary_auth_required`: the primary download requires login or account access
+- `browser_cookie_locked`: the browser cookies database is locked or could not be copied
+- `browser_driver_unavailable`: the Selenium browser driver is unavailable
+- `fallback_context_prepared`: fallback successfully extracted a usable browser context
+- `fallback_media_hint_missing`: no explicit media URL was extracted, so retry falls back to the page URL
+- `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`: stage-specific fallback hints
 
 ## Compatibility Wrappers
 
