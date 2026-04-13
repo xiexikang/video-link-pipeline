@@ -118,6 +118,7 @@ Notes:
 
 - Legacy `summary.api_keys.*` is still read for compatibility, but it now emits a migration warning
 - `vlp doctor` reports the selected FFmpeg source and highlights Selenium/cookies issues
+- `--selenium auto|on|off` is wired into `download` and `run`
 
 ## Usage
 
@@ -129,6 +130,7 @@ vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
 vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
+vlp download "https://..." --selenium auto
 ```
 
 ### Transcribe

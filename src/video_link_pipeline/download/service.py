@@ -12,6 +12,12 @@ from yt_dlp import YoutubeDL
 from ..errors import ConfigError, DependencyMissingError, VlpError
 from ..transcribe.ffmpeg import resolve_ffmpeg_executable
 from .cookies import CookieSource, build_cookie_options, normalize_cookie_source
+from .selenium_fallback import (
+    SeleniumContext,
+    SeleniumFallbackError,
+    run_selenium_browser_context,
+    should_attempt_selenium_fallback,
+)
 
 
 @dataclass(slots=True)
@@ -263,6 +269,83 @@ def _validate_downloaded_files(job_dir: Path, *, audio_only: bool) -> None:
         raise DownloadError("download failed: downloaded video is too small")
 
 
+def _populate_result_from_artifacts(
+    *,
+    result: dict[str, object],
+    artifacts: dict[str, str | None],
+    output_dir: Path,
+    output_root: Path,
+    audio_only: bool,
+) -> dict[str, object]:
+    if artifacts["video"]:
+        result["video"] = str((output_dir / artifacts["video"]).relative_to(output_root))
+    if artifacts["audio_mp3"]:
+        result["audio"] = str((output_dir / artifacts["audio_mp3"]).relative_to(output_root))
+    elif artifacts["audio_m4a"]:
+        result["audio"] = str((output_dir / artifacts["audio_m4a"]).relative_to(output_root))
+    if artifacts["subtitle_vtt"]:
+        result["subtitle"] = str((output_dir / artifacts["subtitle_vtt"]).relative_to(output_root))
+        result["subtitle_vtt"] = result["subtitle"]
+    if artifacts["subtitle_srt"]:
+        result["subtitle_srt"] = str((output_dir / artifacts["subtitle_srt"]).relative_to(output_root))
+    if artifacts["info_json"]:
+        result["info"] = str((output_dir / artifacts["info_json"]).relative_to(output_root))
+    if not audio_only and not result["subtitle"]:
+        result["needs_whisper"] = True
+    result["success"] = True
+    return result
+
+
+def _execute_ydl_download(preparation: DownloadPreparation) -> dict[str, str | None]:
+    with YoutubeDL(preparation.ydl_options) as ydl:
+        ydl.extract_info(preparation.url, download=True)
+    artifacts = standardize_download_artifacts(preparation.output_dir, preparation.output_dir)
+    return artifacts
+
+
+def _retry_with_selenium_context(
+    *,
+    context: SeleniumContext,
+    output_dir: str | Path,
+    languages: list[str] | None,
+    quality: str,
+    audio_only: bool,
+    result: dict[str, object],
+) -> dict[str, object]:
+    preparation = probe_download(
+        url=context.resolved_url,
+        output_dir=output_dir,
+        languages=languages,
+        quality=quality,
+        audio_only=audio_only,
+        cookie_file=context.cookie_file,
+    )
+    preparation.output_dir.mkdir(parents=True, exist_ok=True)
+    preparation.ydl_options["http_headers"] = {
+        "User-Agent": context.user_agent,
+        "Referer": context.referer,
+    }
+
+    result.update(
+        {
+            "title": preparation.title_hint,
+            "folder": str(preparation.output_dir),
+            "ffmpeg_path": preparation.ffmpeg_path,
+        }
+    )
+
+    artifacts = _execute_ydl_download(preparation)
+    _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
+    result["used_selenium_fallback"] = True
+    return _populate_result_from_artifacts(
+        result=result,
+        artifacts=artifacts,
+        output_dir=preparation.output_dir,
+        output_root=preparation.output_root,
+        audio_only=audio_only,
+    )
+
+
 def execute_download(
     *,
     url: str,
@@ -272,24 +355,14 @@ def execute_download(
     audio_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
+    selenium_mode: str = "auto",
 ) -> dict[str, object]:
     """Run the primary yt-dlp download path and return a structured result."""
-    preparation = probe_download(
-        url=url,
-        output_dir=output_dir,
-        languages=languages,
-        quality=quality,
-        audio_only=audio_only,
-        cookies_from_browser=cookies_from_browser,
-        cookie_file=cookie_file,
-    )
-    preparation.output_dir.mkdir(parents=True, exist_ok=True)
-
     result: dict[str, object] = {
         "success": False,
         "url": url,
-        "title": preparation.title_hint,
-        "folder": str(preparation.output_dir),
+        "title": None,
+        "folder": None,
         "video": None,
         "audio": None,
         "subtitle": None,
@@ -298,41 +371,88 @@ def execute_download(
         "info": None,
         "needs_whisper": False,
         "used_selenium_fallback": False,
-        "ffmpeg_path": preparation.ffmpeg_path,
+        "ffmpeg_path": None,
         "error": None,
     }
 
     try:
-        with YoutubeDL(preparation.ydl_options) as ydl:
-            ydl.extract_info(url, download=True)
+        preparation = probe_download(
+            url=url,
+            output_dir=output_dir,
+            languages=languages,
+            quality=quality,
+            audio_only=audio_only,
+            cookies_from_browser=cookies_from_browser,
+            cookie_file=cookie_file,
+        )
+        preparation.output_dir.mkdir(parents=True, exist_ok=True)
+        result["title"] = preparation.title_hint
+        result["folder"] = str(preparation.output_dir)
+        result["ffmpeg_path"] = preparation.ffmpeg_path
 
-        artifacts = standardize_download_artifacts(preparation.output_dir, preparation.output_dir)
+        artifacts = _execute_ydl_download(preparation)
         _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
-
-        root = preparation.output_root
-        if artifacts["video"]:
-            result["video"] = str((preparation.output_dir / artifacts["video"]).relative_to(root))
-        if artifacts["audio_mp3"]:
-            result["audio"] = str((preparation.output_dir / artifacts["audio_mp3"]).relative_to(root))
-        elif artifacts["audio_m4a"]:
-            result["audio"] = str((preparation.output_dir / artifacts["audio_m4a"]).relative_to(root))
-        if artifacts["subtitle_vtt"]:
-            result["subtitle"] = str((preparation.output_dir / artifacts["subtitle_vtt"]).relative_to(root))
-            result["subtitle_vtt"] = result["subtitle"]
-        if artifacts["subtitle_srt"]:
-            result["subtitle_srt"] = str((preparation.output_dir / artifacts["subtitle_srt"]).relative_to(root))
-        if artifacts["info_json"]:
-            result["info"] = str((preparation.output_dir / artifacts["info_json"]).relative_to(root))
-        if not audio_only and not result["subtitle"]:
-            result["needs_whisper"] = True
-
-        result["success"] = True
-        return result
+        return _populate_result_from_artifacts(
+            result=result,
+            artifacts=artifacts,
+            output_dir=preparation.output_dir,
+            output_root=preparation.output_root,
+            audio_only=audio_only,
+        )
     except DownloadError as exc:
         result["error"] = exc.message
-        return result
+        return _handle_download_failure(
+            result=result,
+            output_dir=output_dir,
+            selenium_mode=selenium_mode,
+            languages=languages,
+            quality=quality,
+            audio_only=audio_only,
+        )
     except Exception as exc:
         result["error"] = str(exc)
+        return _handle_download_failure(
+            result=result,
+            output_dir=output_dir,
+            selenium_mode=selenium_mode,
+            languages=languages,
+            quality=quality,
+            audio_only=audio_only,
+        )
+
+
+def _handle_download_failure(
+    *,
+    result: dict[str, object],
+    output_dir: str | Path,
+    selenium_mode: str,
+    languages: list[str] | None,
+    quality: str,
+    audio_only: bool,
+) -> dict[str, object]:
+    error_message = str(result.get("error") or "download failed")
+    if not should_attempt_selenium_fallback(selenium_mode, error_message):
+        return result
+
+    try:
+        context = run_selenium_browser_context(
+            url=str(result["url"]),
+            workspace_dir=str(result.get("folder") or output_dir),
+        )
+        return _retry_with_selenium_context(
+            context=context,
+            output_dir=output_dir,
+            languages=languages,
+            quality=quality,
+            audio_only=audio_only,
+            result=result,
+        )
+    except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:
+        result["used_selenium_fallback"] = False
+        if isinstance(exc, VlpError):
+            result["error"] = exc.message
+        else:
+            result["error"] = str(exc)
         return result
 
 
