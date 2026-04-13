@@ -53,6 +53,34 @@ vlp --help
 vlp doctor
 ```
 
+## 本地开发验证
+
+如果你在本地参与开发，推荐直接安装 dev 依赖：
+
+```bash
+pip install -e .[dev]
+```
+
+与当前 CI 保持一致的最小验证命令：
+
+```bash
+python -m ruff check .
+python -m pytest
+```
+
+如果当前环境还没安装 `pytest`，运行 `python -m pytest` 时会看到类似 `No module named pytest` 的报错。这时重新执行：
+
+```bash
+pip install -e .[dev]
+```
+
+如果你只想先跑某一小组测试，也可以：
+
+```bash
+python -m pytest tests/test_doctor.py
+python -m pytest tests/test_download_diagnostics.py
+```
+
 ## 配置
 
 默认配置文件是项目根目录下的 `config.yaml`。
