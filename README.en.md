@@ -239,6 +239,7 @@ When Selenium fallback is triggered during download, `execution.download` also c
 
 - `used_selenium_fallback`: whether browser fallback was used
 - `error_code`: categorized download failure code, such as `DOWNLOAD_PRIMARY_FAILED`, `DOWNLOAD_FALLBACK_PREPARE_FAILED`, or `DOWNLOAD_FALLBACK_RETRY_FAILED`
+- `hint`: user-facing remediation advice, preferably aligned with doctor guidance and warning-code remediation
 - `fallback_status`: fallback lifecycle status, such as `triggered`, `dependency_missing`, `prepare_failed`, `retry_failed`, or `succeeded`
 - `warnings`: trigger reason, dependency hints, and context-preparation notes
 - `warning_details`: structured warning records with `code`, `message`, and `stage`, useful for batch analytics, for example `primary_http_403`, `browser_cookie_locked`, or `fallback_media_hint_missing`
@@ -270,6 +271,7 @@ A typical download diagnostics fragment looks like this:
       "fallback_status": "dependency_missing",
       "error_code": "DEPENDENCY_MISSING",
       "error": "selenium fallback requested but optional dependencies are not installed",
+      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
         "install with: pip install \"video-link-pipeline[selenium]\""
