@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .download.diagnostics import warning_code_description, warning_code_remediation
+from .download.cookies import KNOWN_BROWSERS
 from .transcribe.ffmpeg import resolve_ffmpeg_executable
 
 
@@ -79,10 +80,11 @@ def _check_ffmpeg() -> DoctorCheck:
             hint="install ffmpeg or keep imageio-ffmpeg in the environment",
         )
 
+    selected_path = Path(selected_ffmpeg).resolve()
     if system_ffmpeg:
-        detail = f"using system ffmpeg: {Path(system_ffmpeg).resolve()}"
+        detail = f"selected ffmpeg source=system path={Path(system_ffmpeg).resolve()}"
     else:
-        detail = f"using imageio-ffmpeg executable: {Path(selected_ffmpeg).resolve()}"
+        detail = f"selected ffmpeg source=imageio-ffmpeg path={selected_path}"
     return DoctorCheck(name="ffmpeg", ok=True, detail=detail, code="ffmpeg_unavailable")
 
 
@@ -91,16 +93,30 @@ def _check_selenium_extra() -> DoctorCheck:
     has_webdriver_manager = importlib.util.find_spec("webdriver_manager") is not None
     ok = has_selenium and has_webdriver_manager
     if ok:
-        detail = "selenium extra is available"
-        return DoctorCheck(name="selenium", ok=True, detail=detail, code="browser_driver_unavailable")
+        detail = "selenium extra is available: selenium=yes webdriver-manager=yes"
+        hint = "make sure Chrome is installed and can launch normally if browser fallback is needed"
+        return DoctorCheck(
+            name="selenium",
+            ok=True,
+            detail=detail,
+            code="browser_driver_unavailable",
+            hint=hint,
+        )
 
     missing = []
     if not has_selenium:
         missing.append("selenium")
     if not has_webdriver_manager:
         missing.append("webdriver-manager")
-    detail = f"selenium fallback is unavailable; missing {', '.join(missing)}"
-    hint = "install with: pip install 'video-link-pipeline[selenium]'"
+    detail = (
+        "selenium fallback is unavailable: "
+        f"selenium={'yes' if has_selenium else 'no'} "
+        f"webdriver-manager={'yes' if has_webdriver_manager else 'no'}"
+    )
+    hint = (
+        "install with: pip install 'video-link-pipeline[selenium]'"
+        f"; missing {', '.join(missing)}"
+    )
     return DoctorCheck(
         name="selenium",
         ok=False,
@@ -116,16 +132,29 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
     cookie_file = download_config.get("cookie_file")
 
     if browser:
+        browser_name = str(browser).strip().lower()
+        if browser_name not in KNOWN_BROWSERS:
+            return [
+                DoctorCheck(
+                    name="cookies",
+                    ok=False,
+                    detail=f"configured browser cookies source is not recognized: {browser}",
+                    code="browser_cookie_locked",
+                    hint="supported browsers: chrome, edge, firefox, opera, brave, vivaldi, safari",
+                )
+            ]
+
+        windows_hint = (
+            "on Windows, fully close the browser before retrying if yt-dlp reports "
+            "'could not copy database' or a locked cookies database"
+        )
         return [
             DoctorCheck(
                 name="cookies",
                 ok=True,
-                detail=f"configured browser cookies source: {browser}",
+                detail=f"configured browser cookies source: {browser_name} (yt-dlp cookiesfrombrowser)",
                 code="browser_cookie_locked",
-                hint=(
-                    "if yt-dlp reports 'could not copy database', close the browser first "
-                    "and retry, especially on Windows"
-                ),
+                hint=windows_hint,
             )
         ]
 
@@ -133,7 +162,12 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
         path = Path(str(cookie_file))
         ok = path.exists()
         detail = f"configured cookie file: {path}"
-        hint = None if ok else "export a Netscape-format cookies.txt file and point --cookie-file to it"
+        if ok:
+            detail = f"{detail} exists=yes"
+            hint = "make sure the file is in Netscape cookies.txt format if download authentication still fails"
+        else:
+            detail = f"{detail} exists=no"
+            hint = "export a Netscape-format cookies.txt file and point --cookie-file to it"
         return [DoctorCheck(name="cookies", ok=ok, detail=detail, code=None, hint=hint)]
 
     return [

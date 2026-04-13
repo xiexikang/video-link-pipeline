@@ -28,12 +28,15 @@ def test_run_checks_reports_browser_cookie_hint(monkeypatch) -> None:
     assert cookies_check.ok is True
     assert cookies_check.code == "browser_cookie_locked"
     assert "chrome" in cookies_check.detail
+    assert "cookiesfrombrowser" in cookies_check.detail
     assert "could not copy database" in str(cookies_check.hint)
     assert ffmpeg_check.ok is True
     assert ffmpeg_check.code == "ffmpeg_unavailable"
-    assert "imageio-ffmpeg" in ffmpeg_check.detail
+    assert "source=imageio-ffmpeg" in ffmpeg_check.detail
     assert selenium_check.ok is True
     assert selenium_check.code == "browser_driver_unavailable"
+    assert "selenium=yes" in selenium_check.detail
+    assert "webdriver-manager=yes" in selenium_check.detail
 
     guidance = doctor_guidance(checks)
     assert any("browser_cookie_locked" in item for item in guidance)
@@ -103,3 +106,35 @@ def test_doctor_command_prints_diagnostic_guidance(monkeypatch, tmp_path: Path) 
     assert "common diagnostic guidance:" in result.stdout
     assert "ffmpeg_unavailable" in result.stdout
     assert "browser_cookie_locked" in result.stdout
+
+
+def test_run_checks_reports_missing_cookie_file(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr(
+        "video_link_pipeline.doctor.importlib.util.find_spec",
+        lambda name: object() if name in {"selenium", "webdriver_manager"} else None,
+    )
+
+    checks = run_checks({"download": {"cookie_file": str(tmp_path / "missing-cookies.txt")}})
+    cookies_check = next(check for check in checks if check.name == "cookies")
+
+    assert cookies_check.ok is False
+    assert "exists=no" in cookies_check.detail
+    assert "Netscape-format cookies.txt" in str(cookies_check.hint)
+
+
+def test_run_checks_reports_unknown_browser_cookie_source(monkeypatch) -> None:
+    monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")
+    monkeypatch.setattr(
+        "video_link_pipeline.doctor.importlib.util.find_spec",
+        lambda name: object() if name in {"selenium", "webdriver_manager"} else None,
+    )
+
+    checks = run_checks({"download": {"cookies_from_browser": "unknown-browser"}})
+    cookies_check = next(check for check in checks if check.name == "cookies")
+
+    assert cookies_check.ok is False
+    assert "not recognized" in cookies_check.detail
+    assert "supported browsers" in str(cookies_check.hint)

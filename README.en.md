@@ -46,6 +46,13 @@ pip install -e .[dev]
 - `browser_driver_unavailable`: install the Selenium extra with `pip install "video-link-pipeline[selenium]"`
 - `ffmpeg_unavailable`: install system ffmpeg or keep `imageio-ffmpeg` available in the environment
 
+`vlp doctor` currently highlights:
+
+- the final FFmpeg selection source and path, such as system `ffmpeg` or `imageio-ffmpeg`
+- whether the Selenium extra is fully available
+- whether cookies are configured via browser extraction or file path
+- focused remediation hints for common Windows issues such as locked cookie databases, missing drivers, and missing FFmpeg
+
 Quick verification:
 
 ```bash
