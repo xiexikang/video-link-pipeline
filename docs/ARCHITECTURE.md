@@ -612,6 +612,8 @@ Testing guidelines:
 - Mock network and provider calls
 - Avoid real downloads in unit tests
 - Keep subtitle conversion tests pure and file-light
+- Local development should use the same baseline commands as CI: `python -m ruff check .` and `python -m pytest`
+- Installing the `dev` extra should be the documented way to obtain `pytest`, `ruff`, and other local verification tools
 
 ## CI Strategy
 
@@ -621,6 +623,12 @@ Minimum GitHub Actions coverage:
 - Python 3.10 and 3.11
 - `ruff`
 - `pytest`
+
+Recommended command alignment:
+
+- Install dependencies with `python -m pip install -e .[dev]`
+- Run lint with `python -m ruff check .`
+- Run tests with `python -m pytest`
 
 Recommended follow-up:
 

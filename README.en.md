@@ -53,6 +53,34 @@ vlp --help
 vlp doctor
 ```
 
+## Local Dev Checks
+
+If you are contributing locally, install the dev extra:
+
+```bash
+pip install -e .[dev]
+```
+
+The minimum validation commands aligned with CI are:
+
+```bash
+python -m ruff check .
+python -m pytest
+```
+
+If `pytest` is not installed yet, `python -m pytest` will fail with an error similar to `No module named pytest`. In that case, run:
+
+```bash
+pip install -e .[dev]
+```
+
+To run only a smaller subset first:
+
+```bash
+python -m pytest tests/test_doctor.py
+python -m pytest tests/test_download_diagnostics.py
+```
+
 ## Configuration
 
 The default config file is `config.yaml` in the repository root.
