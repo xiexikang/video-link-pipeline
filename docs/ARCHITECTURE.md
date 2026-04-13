@@ -75,6 +75,7 @@ Adopt a `src/` layout:
 │     ├─ download/
 │     │  ├─ __init__.py
 │     │  ├─ service.py
+│     │  ├─ diagnostics.py
 │     │  ├─ yt_dlp_backend.py
 │     │  ├─ selenium_fallback.py
 │     │  └─ cookies.py
@@ -319,11 +320,30 @@ Example:
   },
   "execution": {
     "download": {
-      "success": true,
+      "success": false,
       "used_selenium_fallback": false,
-      "error_code": null,
-      "error": null,
-      "warnings": []
+      "fallback_status": "dependency_missing",
+      "error_code": "DEPENDENCY_MISSING",
+      "error": "selenium fallback requested but optional dependencies are not installed",
+      "warnings": [
+        "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+        "install with: pip install \"video-link-pipeline[selenium]\""
+      ],
+      "warning_details": [
+        {
+          "code": "primary_http_403",
+          "stage": "primary_download",
+          "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+          "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
+        },
+        {
+          "code": "fallback_dependency_hint",
+          "stage": "fallback_dependency",
+          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
+          "description": "Additional hint emitted when fallback dependencies are missing."
+        }
+      ],
+      "fallback_context": null
     },
     "transcribe": {
       "success": true,
@@ -349,6 +369,35 @@ Example:
 - Sensitive values must never be written verbatim
 - The manifest must be incrementally mergeable across commands
 - Writes should be atomic to avoid partial or corrupted files
+- `execution.download` should preserve both human-readable `warnings` and structured `warning_details`
+- `warning_details` should carry stable `code`, `stage`, `message`, and `description` fields for batch processing
+- Selenium retry diagnostics should be represented with `fallback_status` and `fallback_context` rather than requiring log scraping
+
+### Download Diagnostics Contract
+
+For v1, the download execution section should standardize on these additional fields:
+
+- `fallback_status`: lifecycle state such as `not_attempted`, `triggered`, `dependency_missing`, `prepare_failed`, `retry_failed`, `prepared`, or `succeeded`
+- `warning_details`: structured warning records for machine consumption
+- `fallback_context.resolved_url`: the final browser URL
+- `fallback_context.canonical_url`: the canonical or equivalent watch URL
+- `fallback_context.media_hint_url`: the extracted media retry URL when available
+- `fallback_context.site_name`: detected site name
+- `fallback_context.extraction_source`: the source of the media hint, such as `next-data:playAddr` or `jsonld:contentUrl`
+
+Representative warning codes include:
+
+- `primary_http_403`
+- `primary_captcha_required`
+- `primary_auth_required`
+- `browser_cookie_locked`
+- `browser_driver_unavailable`
+- `ffmpeg_unavailable`
+- `fallback_context_prepared`
+- `fallback_media_hint_missing`
+- `fallback_dependency_hint`
+- `fallback_prepare_hint`
+- `fallback_retry_hint`
 
 ## Module Responsibilities
 
@@ -388,6 +437,7 @@ Example:
 - Normalizes file names and output structure
 - Detects likely anti-crawling failures
 - Optionally invokes Selenium fallback
+- Emits structured download diagnostics for manifest and CLI output
 
 ### `video_link_pipeline.transcribe`
 
