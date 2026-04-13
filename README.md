@@ -197,6 +197,8 @@ output/
 当下载阶段触发 Selenium fallback 时，`manifest.json` 的 `execution.download` 里还会额外记录诊断字段：
 
 - `used_selenium_fallback`：是否走过浏览器兜底
+- `error_code`：下载失败分类，例如 `DOWNLOAD_PRIMARY_FAILED`、`DOWNLOAD_FALLBACK_PREPARE_FAILED`、`DOWNLOAD_FALLBACK_RETRY_FAILED`
+- `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
 - `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
 - `fallback_context.resolved_url`：浏览器最终停留地址
 - `fallback_context.canonical_url`：页面 canonical 或等价主地址

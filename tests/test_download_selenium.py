@@ -41,6 +41,9 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
 
     assert result["success"] is False
     assert result["used_selenium_fallback"] is False
+    assert result["error_code"] == "DEPENDENCY_MISSING"
+    assert result["error_stage"] == "fallback_dependency"
+    assert result["fallback_status"] == "dependency_missing"
     assert "optional dependencies are not installed" in str(result["error"])
 
 
@@ -71,6 +74,9 @@ def test_execute_download_marks_used_selenium_fallback(monkeypatch, tmp_path: Pa
             **kwargs["result"],
             "success": False,
             "used_selenium_fallback": True,
+            "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+            "error_stage": "fallback_retry",
+            "fallback_status": "retry_failed",
             "error": "selenium fallback retry failed",
         },
     )
@@ -83,6 +89,9 @@ def test_execute_download_marks_used_selenium_fallback(monkeypatch, tmp_path: Pa
 
     assert result["success"] is False
     assert result["used_selenium_fallback"] is True
+    assert result["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert result["error_stage"] == "fallback_retry"
+    assert result["fallback_status"] == "retry_failed"
     assert "retry failed" in str(result["error"])
 
 
@@ -115,6 +124,9 @@ def test_execute_download_can_succeed_after_selenium_retry(monkeypatch, tmp_path
             "folder": "job",
             "video": "job/video.mp4",
             "used_selenium_fallback": True,
+            "error_code": None,
+            "error_stage": None,
+            "fallback_status": "succeeded",
             "error": None,
         },
     )
@@ -127,6 +139,7 @@ def test_execute_download_can_succeed_after_selenium_retry(monkeypatch, tmp_path
 
     assert result["success"] is True
     assert result["used_selenium_fallback"] is True
+    assert result["fallback_status"] == "succeeded"
     assert result["video"] == "job/video.mp4"
 
 

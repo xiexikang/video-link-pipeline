@@ -197,6 +197,8 @@ output/
 When Selenium fallback is triggered during download, `execution.download` also carries extra diagnostics:
 
 - `used_selenium_fallback`: whether browser fallback was used
+- `error_code`: categorized download failure code, such as `DOWNLOAD_PRIMARY_FAILED`, `DOWNLOAD_FALLBACK_PREPARE_FAILED`, or `DOWNLOAD_FALLBACK_RETRY_FAILED`
+- `fallback_status`: fallback lifecycle status, such as `triggered`, `dependency_missing`, `prepare_failed`, `retry_failed`, or `succeeded`
 - `warnings`: trigger reason, dependency hints, and context-preparation notes
 - `fallback_context.resolved_url`: the final browser URL
 - `fallback_context.canonical_url`: the canonical page URL when available
