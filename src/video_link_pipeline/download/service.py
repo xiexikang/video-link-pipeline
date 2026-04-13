@@ -294,6 +294,8 @@ def _populate_result_from_artifacts(
     if not audio_only and not result["subtitle"]:
         result["needs_whisper"] = True
     result["success"] = True
+    result["error_code"] = None
+    result["error_stage"] = None
     return result
 
 
@@ -352,10 +354,12 @@ def _retry_with_selenium_context(
         "site_name": context.site_name,
         "extraction_source": context.extraction_source,
     }
+    result["fallback_status"] = "prepared"
 
     artifacts = _execute_ydl_download(preparation)
     _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
     result["used_selenium_fallback"] = True
+    result["fallback_status"] = "succeeded"
     return _populate_result_from_artifacts(
         result=result,
         artifacts=artifacts,
@@ -400,6 +404,9 @@ def execute_download(
         "needs_whisper": False,
         "used_selenium_fallback": False,
         "ffmpeg_path": None,
+        "error_code": None,
+        "error_stage": None,
+        "fallback_status": "not_attempted",
         "warnings": [],
         "fallback_context": None,
         "error": None,
@@ -431,6 +438,8 @@ def execute_download(
         )
     except DownloadError as exc:
         result["error"] = exc.message
+        result["error_code"] = "DOWNLOAD_PRIMARY_FAILED"
+        result["error_stage"] = "primary_download"
         return _handle_download_failure(
             result=result,
             output_dir=output_dir,
@@ -441,6 +450,8 @@ def execute_download(
         )
     except Exception as exc:
         result["error"] = str(exc)
+        result["error_code"] = "DOWNLOAD_PRIMARY_FAILED"
+        result["error_stage"] = "primary_download"
         return _handle_download_failure(
             result=result,
             output_dir=output_dir,
@@ -463,6 +474,7 @@ def _handle_download_failure(
     error_message = str(result.get("error") or "download failed")
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
         return result
+    result["fallback_status"] = "triggered"
     warnings = list(result.get("warnings") or [])
     warnings.append(f"primary download failed and triggered selenium fallback: {error_message}")
     result["warnings"] = warnings
@@ -485,10 +497,25 @@ def _handle_download_failure(
         warnings = list(result.get("warnings") or [])
         if isinstance(exc, VlpError):
             result["error"] = exc.message
+            if isinstance(exc, DependencyMissingError):
+                result["error_code"] = "DEPENDENCY_MISSING"
+                result["error_stage"] = "fallback_dependency"
+                result["fallback_status"] = "dependency_missing"
+            elif isinstance(exc, SeleniumFallbackError):
+                result["error_code"] = "DOWNLOAD_FALLBACK_PREPARE_FAILED"
+                result["error_stage"] = "fallback_prepare"
+                result["fallback_status"] = "prepare_failed"
+            elif isinstance(exc, DownloadError):
+                result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
+                result["error_stage"] = "fallback_retry"
+                result["fallback_status"] = "retry_failed"
             if exc.hint:
                 warnings.append(exc.hint)
         else:
             result["error"] = str(exc)
+            result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
+            result["error_stage"] = "fallback_retry"
+            result["fallback_status"] = "retry_failed"
         result["warnings"] = warnings
         return result
 

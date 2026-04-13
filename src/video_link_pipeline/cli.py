@@ -109,8 +109,9 @@ def _write_download_manifest(
             "download": {
                 "success": bool(result.get("success")),
                 "used_selenium_fallback": bool(result.get("used_selenium_fallback", False)),
+                "fallback_status": result.get("fallback_status"),
                 "fallback_context": result.get("fallback_context"),
-                "error_code": None if result.get("success") else "DOWNLOAD_FAILED",
+                "error_code": result.get("error_code") or (None if result.get("success") else "DOWNLOAD_FAILED"),
                 "error": result.get("error"),
                 "warnings": list(result.get("warnings") or []),
             }
@@ -122,8 +123,14 @@ def _write_download_manifest(
 def _render_download_diagnostics(result: dict[str, object]) -> None:
     warnings = [str(item) for item in list(result.get("warnings") or []) if item]
     fallback_context = result.get("fallback_context")
+    fallback_status = result.get("fallback_status")
+    error_code = result.get("error_code")
     if bool(result.get("used_selenium_fallback")):
         log.warning("download used selenium fallback")
+    if fallback_status and fallback_status != "not_attempted":
+        log.info(f"fallback status={fallback_status}")
+    if error_code:
+        log.info(f"download error_code={error_code}")
     if isinstance(fallback_context, dict):
         extraction_source = fallback_context.get("extraction_source")
         media_hint_url = fallback_context.get("media_hint_url")
@@ -286,7 +293,10 @@ def download_command(
     _render_download_diagnostics(result)
 
     if not result["success"]:
-        raise VlpError(str(result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
+        raise VlpError(
+            str(result["error"] or "download failed"),
+            error_code=str(result.get("error_code") or "DOWNLOAD_FAILED"),
+        )
 
     log.success("download completed")
     log.info(f"folder={result['folder']}")
@@ -481,7 +491,10 @@ def run_command(
     )
     _render_download_diagnostics(download_result)
     if not download_result["success"]:
-        raise VlpError(str(download_result["error"] or "download failed"), error_code="DOWNLOAD_FAILED")
+        raise VlpError(
+            str(download_result["error"] or "download failed"),
+            error_code=str(download_result.get("error_code") or "DOWNLOAD_FAILED"),
+        )
 
     job_dir = _absolute_from_root(str(download_result.get("folder")), output_root)
     if job_dir is None:
