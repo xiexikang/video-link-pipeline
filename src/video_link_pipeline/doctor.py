@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .download.diagnostics import warning_code_description, warning_code_remediation
+from .download.diagnostics import (
+    preferred_warning_hint,
+    warning_code_description,
+    warning_code_remediation,
+)
 from .download.cookies import KNOWN_BROWSERS
 from .transcribe.ffmpeg import resolve_ffmpeg_executable
 
@@ -77,7 +81,7 @@ def _check_ffmpeg() -> DoctorCheck:
             ok=False,
             detail="ffmpeg was not found in PATH and imageio-ffmpeg is unavailable",
             code="ffmpeg_unavailable",
-            hint="install ffmpeg or keep imageio-ffmpeg in the environment",
+            hint=preferred_warning_hint("ffmpeg_unavailable"),
         )
 
     selected_path = Path(selected_ffmpeg).resolve()
@@ -100,7 +104,7 @@ def _check_selenium_extra() -> DoctorCheck:
             ok=True,
             detail=detail,
             code="browser_driver_unavailable",
-            hint=hint,
+            hint=preferred_warning_hint("browser_driver_unavailable", hint),
         )
 
     missing = []
@@ -122,7 +126,7 @@ def _check_selenium_extra() -> DoctorCheck:
         ok=False,
         detail=detail,
         code="browser_driver_unavailable",
-        hint=hint,
+        hint=preferred_warning_hint("browser_driver_unavailable", hint),
     )
 
 
@@ -154,7 +158,7 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
                 ok=True,
                 detail=f"configured browser cookies source: {browser_name} (yt-dlp cookiesfrombrowser)",
                 code="browser_cookie_locked",
-                hint=windows_hint,
+                hint=preferred_warning_hint("browser_cookie_locked", windows_hint),
             )
         ]
 
@@ -176,6 +180,9 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
             ok=True,
             detail="no cookie source configured",
             code="primary_auth_required",
-            hint="use --cookies-from-browser or --cookie-file when a site requires login",
+            hint=preferred_warning_hint(
+                "primary_auth_required",
+                "use --cookies-from-browser or --cookie-file when a site requires login",
+            ),
         )
     ]

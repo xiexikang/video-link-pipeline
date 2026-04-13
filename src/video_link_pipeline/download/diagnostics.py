@@ -49,3 +49,11 @@ def warning_code_description(code: str) -> str | None:
 
 def warning_code_remediation(code: str) -> str | None:
     return WARNING_REMEDIATIONS.get(code)
+
+
+def preferred_warning_hint(code: str, fallback_hint: str | None = None) -> str | None:
+    remediation = warning_code_remediation(code)
+    normalized_fallback = str(fallback_hint or "").strip() or None
+    if remediation:
+        return remediation
+    return normalized_fallback
