@@ -59,12 +59,31 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("video_link_pipeline.cli.run_checks", lambda _: [])
+    monkeypatch.setattr(
+        "video_link_pipeline.cli.run_checks",
+        lambda _: [
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="python",
+                ok=True,
+                detail="Python 3.11.0",
+                section="runtime",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="ffmpeg",
+                ok=True,
+                detail="selected ffmpeg source=system path=C:/ffmpeg/bin/ffmpeg.exe",
+                section="download_prerequisites",
+                code="ffmpeg_unavailable",
+            ),
+        ],
+    )
 
     result = runner.invoke(app, ["doctor", "--config", str(config_path)])
 
     assert result.exit_code == 0
     assert "summary provider=deepseek" in result.stdout
+    assert "runtime:" in result.stdout
+    assert "download prerequisites:" in result.stdout
     assert "doctor checks passed" in result.stdout
 
 
@@ -105,6 +124,7 @@ def test_doctor_command_prints_diagnostic_guidance(monkeypatch, tmp_path: Path) 
     result = runner.invoke(app, ["doctor", "--config", str(config_path)])
 
     assert result.exit_code == 0
+    assert "download prerequisites:" in result.stdout
     assert "common diagnostic guidance:" in result.stdout
     assert "ffmpeg_unavailable" in result.stdout
     assert "browser_cookie_locked" in result.stdout
