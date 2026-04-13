@@ -40,6 +40,12 @@ To install development dependencies:
 pip install -e .[dev]
 ```
 
+`vlp doctor` now also surfaces common download diagnostics and suggested fixes, especially for Windows-oriented issues:
+
+- `browser_cookie_locked`: close Chrome / Edge / Firefox completely before retrying browser-cookie extraction
+- `browser_driver_unavailable`: install the Selenium extra with `pip install "video-link-pipeline[selenium]"`
+- `ffmpeg_unavailable`: install system ffmpeg or keep `imageio-ffmpeg` available in the environment
+
 Quick verification:
 
 ```bash
@@ -217,6 +223,47 @@ Common `warning_details.code` values:
 - `fallback_context_prepared`: fallback successfully extracted a usable browser context
 - `fallback_media_hint_missing`: no explicit media URL was extracted, so retry falls back to the page URL
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`: stage-specific fallback hints
+
+A typical download diagnostics fragment looks like this:
+
+```json
+{
+  "execution": {
+    "download": {
+      "success": false,
+      "used_selenium_fallback": false,
+      "fallback_status": "dependency_missing",
+      "error_code": "DEPENDENCY_MISSING",
+      "error": "selenium fallback requested but optional dependencies are not installed",
+      "warnings": [
+        "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+        "install with: pip install \"video-link-pipeline[selenium]\""
+      ],
+      "warning_details": [
+        {
+          "code": "primary_http_403",
+          "stage": "primary_download",
+          "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+          "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
+        },
+        {
+          "code": "fallback_dependency_hint",
+          "stage": "fallback_dependency",
+          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
+          "description": "Additional hint emitted when fallback dependencies are missing."
+        }
+      ],
+      "fallback_context": null
+    }
+  }
+}
+```
+
+If fallback successfully prepares a browser context, the common signals become:
+
+- `fallback_status = "prepared"` or `"succeeded"`
+- `warning_details.code` contains `fallback_context_prepared`
+- `fallback_context.media_hint_url` and `fallback_context.extraction_source` can be used to analyze extractor quality per site
 
 ## Compatibility Wrappers
 

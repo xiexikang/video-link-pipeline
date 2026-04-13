@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .download.diagnostics import warning_code_description, warning_code_remediation
 from .transcribe.ffmpeg import resolve_ffmpeg_executable
 
 
@@ -19,6 +20,7 @@ class DoctorCheck:
     name: str
     ok: bool
     detail: str
+    code: str | None = None
     hint: str | None = None
 
 
@@ -33,6 +35,22 @@ def run_checks(config: dict[str, Any] | None = None) -> list[DoctorCheck]:
     ]
     checks.extend(_check_cookie_configuration(effective_config))
     return checks
+
+
+def doctor_guidance(checks: list[DoctorCheck]) -> list[str]:
+    lines: list[str] = []
+    seen: set[str] = set()
+    for check in checks:
+        if not check.code or check.code in seen:
+            continue
+        description = warning_code_description(check.code)
+        remediation = warning_code_remediation(check.code)
+        if description:
+            lines.append(f"{check.code}: {description}")
+        if remediation:
+            lines.append(f"{check.code} fix: {remediation}")
+        seen.add(check.code)
+    return lines
 
 
 def _check_python_runtime() -> DoctorCheck:
@@ -57,6 +75,7 @@ def _check_ffmpeg() -> DoctorCheck:
             name="ffmpeg",
             ok=False,
             detail="ffmpeg was not found in PATH and imageio-ffmpeg is unavailable",
+            code="ffmpeg_unavailable",
             hint="install ffmpeg or keep imageio-ffmpeg in the environment",
         )
 
@@ -64,7 +83,7 @@ def _check_ffmpeg() -> DoctorCheck:
         detail = f"using system ffmpeg: {Path(system_ffmpeg).resolve()}"
     else:
         detail = f"using imageio-ffmpeg executable: {Path(selected_ffmpeg).resolve()}"
-    return DoctorCheck(name="ffmpeg", ok=True, detail=detail)
+    return DoctorCheck(name="ffmpeg", ok=True, detail=detail, code="ffmpeg_unavailable")
 
 
 def _check_selenium_extra() -> DoctorCheck:
@@ -73,7 +92,7 @@ def _check_selenium_extra() -> DoctorCheck:
     ok = has_selenium and has_webdriver_manager
     if ok:
         detail = "selenium extra is available"
-        return DoctorCheck(name="selenium", ok=True, detail=detail)
+        return DoctorCheck(name="selenium", ok=True, detail=detail, code="browser_driver_unavailable")
 
     missing = []
     if not has_selenium:
@@ -82,7 +101,13 @@ def _check_selenium_extra() -> DoctorCheck:
         missing.append("webdriver-manager")
     detail = f"selenium fallback is unavailable; missing {', '.join(missing)}"
     hint = "install with: pip install 'video-link-pipeline[selenium]'"
-    return DoctorCheck(name="selenium", ok=False, detail=detail, hint=hint)
+    return DoctorCheck(
+        name="selenium",
+        ok=False,
+        detail=detail,
+        code="browser_driver_unavailable",
+        hint=hint,
+    )
 
 
 def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
@@ -96,6 +121,7 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
                 name="cookies",
                 ok=True,
                 detail=f"configured browser cookies source: {browser}",
+                code="browser_cookie_locked",
                 hint=(
                     "if yt-dlp reports 'could not copy database', close the browser first "
                     "and retry, especially on Windows"
@@ -108,13 +134,14 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
         ok = path.exists()
         detail = f"configured cookie file: {path}"
         hint = None if ok else "export a Netscape-format cookies.txt file and point --cookie-file to it"
-        return [DoctorCheck(name="cookies", ok=ok, detail=detail, hint=hint)]
+        return [DoctorCheck(name="cookies", ok=ok, detail=detail, code=None, hint=hint)]
 
     return [
         DoctorCheck(
             name="cookies",
             ok=True,
             detail="no cookie source configured",
+            code="primary_auth_required",
             hint="use --cookies-from-browser or --cookie-file when a site requires login",
         )
     ]

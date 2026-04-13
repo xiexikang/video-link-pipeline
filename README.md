@@ -40,6 +40,12 @@ pip install -e .[selenium]
 pip install -e .[dev]
 ```
 
+`vlp doctor` 现在会把部分常见下载诊断码和修复建议串起来，尤其是这些 Windows 常见问题：
+
+- `browser_cookie_locked`：浏览器 cookies 数据库被占用时，先完全关闭 Chrome / Edge / Firefox 再重试
+- `browser_driver_unavailable`：未安装 Selenium extra 或浏览器驱动不可用时，先执行 `pip install "video-link-pipeline[selenium]"`
+- `ffmpeg_unavailable`：系统没有可用 FFmpeg 时，安装系统 ffmpeg，或确保环境中保留 `imageio-ffmpeg`
+
 安装完成后可以先检查命令是否可用：
 
 ```bash
@@ -217,6 +223,47 @@ output/
 - `fallback_context_prepared`：fallback 已成功提取浏览器上下文
 - `fallback_media_hint_missing`：未提取到明确媒体地址，只能用页面地址重试
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
+
+一个典型的下载诊断片段示例如下：
+
+```json
+{
+  "execution": {
+    "download": {
+      "success": false,
+      "used_selenium_fallback": false,
+      "fallback_status": "dependency_missing",
+      "error_code": "DEPENDENCY_MISSING",
+      "error": "selenium fallback requested but optional dependencies are not installed",
+      "warnings": [
+        "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+        "install with: pip install \"video-link-pipeline[selenium]\""
+      ],
+      "warning_details": [
+        {
+          "code": "primary_http_403",
+          "stage": "primary_download",
+          "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+          "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
+        },
+        {
+          "code": "fallback_dependency_hint",
+          "stage": "fallback_dependency",
+          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
+          "description": "Additional hint emitted when fallback dependencies are missing."
+        }
+      ],
+      "fallback_context": null
+    }
+  }
+}
+```
+
+如果 fallback 已成功准备浏览器上下文，常见字段会变成：
+
+- `fallback_status = "prepared"` 或 `"succeeded"`
+- `warning_details.code` 里出现 `fallback_context_prepared`
+- `fallback_context.media_hint_url`、`fallback_context.extraction_source` 可用于后续分析站点提取质量
 
 ## 兼容脚本
 
