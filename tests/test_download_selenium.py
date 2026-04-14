@@ -14,6 +14,7 @@ from video_link_pipeline.download.service import (
     _apply_preparation_metadata,
     _build_fallback_context,
     _build_retry_headers,
+    _execute_primary_download,
     _prepare_retry_download,
     _record_retry_context_state,
     _fallback_exception_warning_code,
@@ -225,6 +226,53 @@ def test_prepare_retry_download_applies_probe_headers_and_metadata(monkeypatch, 
     assert result["title"] == "demo"
     assert result["folder"] == str(tmp_path / "job")
     assert result["ffmpeg_path"] == "ffmpeg"
+
+
+def test_execute_primary_download_applies_metadata_and_artifacts(monkeypatch, tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+
+    class FakePreparation:
+        def __init__(self) -> None:
+            self.url = "https://example.com/video"
+            self.output_root = tmp_path
+            self.output_dir = tmp_path / "job"
+            self.title_hint = "demo"
+            self.ffmpeg_path = "ffmpeg"
+            self.ydl_options = {}
+
+    monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._execute_ydl_download",
+        lambda preparation: {
+            "video": "video.mp4",
+            "audio_mp3": None,
+            "audio_m4a": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info_json": None,
+        },
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._validate_downloaded_files",
+        lambda *args, **kwargs: None,
+    )
+
+    updated = _execute_primary_download(
+        url="https://example.com/video",
+        output_dir=tmp_path,
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        cookies_from_browser=None,
+        cookie_file=None,
+        result=result,
+    )
+
+    assert updated["success"] is True
+    assert updated["title"] == "demo"
+    assert updated["folder"] == str(tmp_path / "job")
+    assert updated["ffmpeg_path"] == "ffmpeg"
+    assert updated["video"] == "job/video.mp4"
 
 
 def test_record_retry_context_state_updates_description_context_and_status(tmp_path: Path) -> None:
