@@ -465,6 +465,7 @@ Representative warning codes include:
 - Performs environment diagnostics
 - Reports availability and selected executable paths
 - Groups output into `runtime`, `download prerequisites`, and `config risks`
+- Shows the effective `download.selenium` mode directly in doctor output
 - Checks risky download config combinations such as conflicting cookie sources
 - Provides actionable remediation guidance
 - Uses `WARN` for blocking conflicts and `INFO` for non-blocking but noteworthy config-risk items

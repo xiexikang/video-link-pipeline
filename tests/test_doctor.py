@@ -76,6 +76,12 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
                 code="ffmpeg_unavailable",
             ),
             __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_selenium",
+                ok=True,
+                detail="effective download.selenium=off",
+                section="config_risks",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
                 name="download_config",
                 ok=True,
                 detail="download selenium=off and no cookie source is configured",
@@ -92,6 +98,7 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
     assert "runtime:" in result.stdout
     assert "download prerequisites:" in result.stdout
     assert "config risks:" in result.stdout
+    assert "[INFO] download_selenium: effective download.selenium=off" in result.stdout
     assert "[INFO] download_config: download selenium=off and no cookie source is configured" in result.stdout
     assert "doctor checks passed" in result.stdout
 
@@ -172,8 +179,11 @@ def test_run_checks_reports_selenium_off_without_cookie_source(monkeypatch) -> N
     )
 
     checks = run_checks({"download": {"selenium": "off"}})
+    selenium_mode_check = next(check for check in checks if check.name == "download_selenium")
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
+    assert selenium_mode_check.ok is True
+    assert selenium_mode_check.detail == "effective download.selenium=off"
     assert risk_check.ok is True
     assert risk_check.code == "primary_auth_required"
     assert risk_check.hint == warning_code_remediation("primary_auth_required")
@@ -188,8 +198,11 @@ def test_run_checks_reports_selenium_on_risk(monkeypatch) -> None:
     )
 
     checks = run_checks({"download": {"selenium": "on"}})
+    selenium_mode_check = next(check for check in checks if check.name == "download_selenium")
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
+    assert selenium_mode_check.ok is True
+    assert selenium_mode_check.detail == "effective download.selenium=on"
     assert risk_check.ok is True
     assert risk_check.code == "browser_driver_unavailable"
     assert risk_check.hint == warning_code_remediation("browser_driver_unavailable")
