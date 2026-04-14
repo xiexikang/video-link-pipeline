@@ -125,6 +125,7 @@ def _set_failure_state(
     error_stage: str,
     fallback_status: str | None = None,
 ) -> None:
+    """Update the structured result with a normalized failure state."""
     result["error"] = error
     result["error_code"] = error_code
     result["error_stage"] = error_stage
@@ -140,6 +141,7 @@ def _append_hint_warning(
     stage: str,
     overwrite_hint: bool = False,
 ) -> str:
+    """Append a warning derived from a hint string and optionally promote its remediation."""
     warning_code = _classify_hint_warning(hint, default_code=default_code)
     _append_warning(
         result,
@@ -156,6 +158,7 @@ def _append_hint_warning(
 
 
 def _record_primary_download_warning(result: dict[str, object], error_message: str) -> str:
+    """Record the primary-download failure warning and set its best hint."""
     warning_code = _classify_primary_warning(error_message)
     _append_warning(
         result,
@@ -168,6 +171,7 @@ def _record_primary_download_warning(result: dict[str, object], error_message: s
 
 
 def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
+    """Serialize Selenium context into the stable manifest-friendly shape."""
     return {
         "resolved_url": context.resolved_url,
         "canonical_url": context.canonical_url,
@@ -178,6 +182,7 @@ def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
 
 
 def _record_fallback_prepare_warnings(result: dict[str, object], context: SeleniumContext) -> None:
+    """Record warnings emitted while preparing fallback browser context."""
     _append_warning(
         result,
         code="fallback_context_prepared",
@@ -197,12 +202,14 @@ def _record_fallback_prepare_warnings(result: dict[str, object], context: Seleni
 
 
 def _apply_preparation_metadata(result: dict[str, object], preparation: DownloadPreparation) -> None:
+    """Copy common preparation metadata onto the structured result."""
     result["title"] = preparation.title_hint
     result["folder"] = str(preparation.output_dir)
     result["ffmpeg_path"] = preparation.ffmpeg_path
 
 
 def _build_retry_headers(context: SeleniumContext) -> dict[str, str]:
+    """Build the headers used when retrying yt-dlp with browser-derived context."""
     headers = {
         "User-Agent": context.user_agent,
         "Referer": context.canonical_url or context.referer,
@@ -222,6 +229,7 @@ def _prepare_retry_download(
     audio_only: bool,
     result: dict[str, object],
 ) -> DownloadPreparation:
+    """Probe and prepare the fallback retry download request."""
     retry_url = context.media_hint_url or context.canonical_url or context.resolved_url
     preparation = probe_download(
         url=retry_url,
@@ -238,6 +246,7 @@ def _prepare_retry_download(
 
 
 def _record_retry_context_state(result: dict[str, object], context: SeleniumContext) -> None:
+    """Persist prepared fallback context and related warnings onto the result."""
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
     _record_fallback_prepare_warnings(result, context)
@@ -246,6 +255,7 @@ def _record_retry_context_state(result: dict[str, object], context: SeleniumCont
 
 
 def _fallback_exception_warning_code(exc: Exception) -> str:
+    """Map retry-stage exceptions to their default warning code family."""
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
     if isinstance(exc, SeleniumFallbackError):
@@ -555,6 +565,7 @@ def _execute_primary_download(
     cookie_file: str | Path | None,
     result: dict[str, object],
 ) -> dict[str, object]:
+    """Run the primary yt-dlp path and populate the structured result on success."""
     preparation = probe_download(
         url=url,
         output_dir=output_dir,
