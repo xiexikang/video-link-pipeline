@@ -9,7 +9,7 @@ import typer
 
 from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
-from .doctor import doctor_guidance, run_checks
+from .doctor import doctor_guidance, doctor_reference_lines, run_checks
 from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
 from .manifest import upsert_manifest
@@ -591,6 +591,7 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     log.info(f"summary provider={redacted['summary']['provider']}")
     checks = run_checks(bundle.effective_config)
     guidance = doctor_guidance(checks)
+    reference_lines = doctor_reference_lines()
 
     has_failures = False
 
@@ -635,6 +636,11 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     if guidance:
         log.info("common diagnostic guidance:")
         for line in guidance:
+            log.info(f"- {line}")
+
+    if reference_lines:
+        log.info("known diagnostic codes:")
+        for line in reference_lines:
             log.info(f"- {line}")
 
     if has_failures:
