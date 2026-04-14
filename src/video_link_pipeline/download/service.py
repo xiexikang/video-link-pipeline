@@ -544,6 +544,40 @@ def _execute_ydl_download(preparation: DownloadPreparation) -> dict[str, str | N
     return artifacts
 
 
+def _execute_primary_download(
+    *,
+    url: str,
+    output_dir: str | Path,
+    languages: list[str] | None,
+    quality: str,
+    audio_only: bool,
+    cookies_from_browser: str | None,
+    cookie_file: str | Path | None,
+    result: dict[str, object],
+) -> dict[str, object]:
+    preparation = probe_download(
+        url=url,
+        output_dir=output_dir,
+        languages=languages,
+        quality=quality,
+        audio_only=audio_only,
+        cookies_from_browser=cookies_from_browser,
+        cookie_file=cookie_file,
+    )
+    preparation.output_dir.mkdir(parents=True, exist_ok=True)
+    _apply_preparation_metadata(result, preparation)
+
+    artifacts = _execute_ydl_download(preparation)
+    _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
+    return _populate_result_from_artifacts(
+        result=result,
+        artifacts=artifacts,
+        output_dir=preparation.output_dir,
+        output_root=preparation.output_root,
+        audio_only=audio_only,
+    )
+
+
 def _retry_with_selenium_context(
     *,
     context: SeleniumContext,
@@ -600,7 +634,7 @@ def execute_download(
     result = new_download_result(url)
 
     try:
-        preparation = probe_download(
+        return _execute_primary_download(
             url=url,
             output_dir=output_dir,
             languages=languages,
@@ -608,18 +642,7 @@ def execute_download(
             audio_only=audio_only,
             cookies_from_browser=cookies_from_browser,
             cookie_file=cookie_file,
-        )
-        preparation.output_dir.mkdir(parents=True, exist_ok=True)
-        _apply_preparation_metadata(result, preparation)
-
-        artifacts = _execute_ydl_download(preparation)
-        _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
-        return _populate_result_from_artifacts(
             result=result,
-            artifacts=artifacts,
-            output_dir=preparation.output_dir,
-            output_root=preparation.output_root,
-            audio_only=audio_only,
         )
     except DownloadError as exc:
         _set_failure_state(
