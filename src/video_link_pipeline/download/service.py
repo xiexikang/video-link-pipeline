@@ -213,6 +213,30 @@ def _build_retry_headers(context: SeleniumContext) -> dict[str, str]:
     return headers
 
 
+def _prepare_retry_download(
+    *,
+    context: SeleniumContext,
+    output_dir: str | Path,
+    languages: list[str] | None,
+    quality: str,
+    audio_only: bool,
+    result: dict[str, object],
+) -> DownloadPreparation:
+    retry_url = context.media_hint_url or context.canonical_url or context.resolved_url
+    preparation = probe_download(
+        url=retry_url,
+        output_dir=output_dir,
+        languages=languages,
+        quality=quality,
+        audio_only=audio_only,
+        cookie_file=context.cookie_file,
+    )
+    preparation.output_dir.mkdir(parents=True, exist_ok=True)
+    preparation.ydl_options["http_headers"] = _build_retry_headers(context)
+    _apply_preparation_metadata(result, preparation)
+    return preparation
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -521,19 +545,14 @@ def _retry_with_selenium_context(
     audio_only: bool,
     result: dict[str, object],
 ) -> dict[str, object]:
-    retry_url = context.media_hint_url or context.canonical_url or context.resolved_url
-    preparation = probe_download(
-        url=retry_url,
+    preparation = _prepare_retry_download(
+        context=context,
         output_dir=output_dir,
         languages=languages,
         quality=quality,
         audio_only=audio_only,
-        cookie_file=context.cookie_file,
+        result=result,
     )
-    preparation.output_dir.mkdir(parents=True, exist_ok=True)
-    preparation.ydl_options["http_headers"] = _build_retry_headers(context)
-
-    _apply_preparation_metadata(result, preparation)
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
     warnings = list(result.get("warnings") or [])

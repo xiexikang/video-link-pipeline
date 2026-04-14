@@ -14,6 +14,7 @@ from video_link_pipeline.download.service import (
     _apply_preparation_metadata,
     _build_fallback_context,
     _build_retry_headers,
+    _prepare_retry_download,
     _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
@@ -171,6 +172,58 @@ def test_build_retry_headers_prefers_canonical_url_and_origin(tmp_path: Path) ->
     assert headers["User-Agent"] == "mobile-ua"
     assert headers["Referer"] == "https://example.com/watch/demo"
     assert headers["Origin"] == "https://example.com"
+
+
+def test_prepare_retry_download_applies_probe_headers_and_metadata(monkeypatch, tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+
+    class FakePreparation:
+        def __init__(self) -> None:
+            self.url = "https://cdn.example.com/media.m3u8"
+            self.output_root = tmp_path
+            self.output_dir = tmp_path / "job"
+            self.title_hint = "demo"
+            self.ffmpeg_path = "ffmpeg"
+            self.ydl_options = {}
+
+    captured: dict[str, object] = {}
+
+    def fake_probe_download(**kwargs):
+        captured["probe_url"] = kwargs["url"]
+        captured["cookie_file"] = kwargs["cookie_file"]
+        return FakePreparation()
+
+    monkeypatch.setattr("video_link_pipeline.download.service.probe_download", fake_probe_download)
+
+    preparation = _prepare_retry_download(
+        context=SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/resolved",
+            page_title="demo",
+            user_agent="mobile-ua",
+            referer="https://example.com/fallback-referrer",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="page description",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://cdn.example.com/media.m3u8",
+            site_name="example.com",
+            extraction_source="jsonld:contentUrl",
+        ),
+        output_dir=tmp_path,
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        result=result,
+    )
+
+    assert captured["probe_url"] == "https://cdn.example.com/media.m3u8"
+    assert Path(str(captured["cookie_file"])) == tmp_path / "cookies.txt"
+    assert preparation.ydl_options["http_headers"]["User-Agent"] == "mobile-ua"
+    assert preparation.ydl_options["http_headers"]["Referer"] == "https://example.com/watch/demo"
+    assert preparation.ydl_options["http_headers"]["Origin"] == "https://example.com"
+    assert result["title"] == "demo"
+    assert result["folder"] == str(tmp_path / "job")
+    assert result["ffmpeg_path"] == "ffmpeg"
 
 
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
