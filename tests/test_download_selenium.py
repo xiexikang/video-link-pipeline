@@ -13,6 +13,7 @@ from video_link_pipeline.download.service import (
     _append_hint_warning,
     _apply_preparation_metadata,
     _build_fallback_context,
+    _build_retry_headers,
     _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
@@ -148,6 +149,28 @@ def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -
     assert result["title"] == "demo-title"
     assert result["folder"] == str(tmp_path / "job")
     assert result["ffmpeg_path"] == "C:/ffmpeg/bin/ffmpeg.exe"
+
+
+def test_build_retry_headers_prefers_canonical_url_and_origin(tmp_path: Path) -> None:
+    context = SeleniumContext(
+        original_url="https://example.com/video",
+        resolved_url="https://example.com/resolved",
+        page_title="demo",
+        user_agent="mobile-ua",
+        referer="https://example.com/fallback-referrer",
+        cookie_file=tmp_path / "cookies.txt",
+        page_description="page description",
+        canonical_url="https://example.com/watch/demo",
+        media_hint_url="https://cdn.example.com/media.m3u8",
+        site_name="example.com",
+        extraction_source="jsonld:contentUrl",
+    )
+
+    headers = _build_retry_headers(context)
+
+    assert headers["User-Agent"] == "mobile-ua"
+    assert headers["Referer"] == "https://example.com/watch/demo"
+    assert headers["Origin"] == "https://example.com"
 
 
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
