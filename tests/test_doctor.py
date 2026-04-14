@@ -79,19 +79,19 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
                 name="download_selenium",
                 ok=True,
                 detail="effective download.selenium=off",
-                section="config_risks",
+                section="effective_download_config",
             ),
             __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
                 name="download_cookies_from_browser",
                 ok=True,
                 detail="effective download.cookies_from_browser=edge",
-                section="config_risks",
+                section="effective_download_config",
             ),
             __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
                 name="download_cookie_file",
                 ok=True,
                 detail="effective download.cookie_file=none",
-                section="config_risks",
+                section="effective_download_config",
             ),
             __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
                 name="download_config",
@@ -109,6 +109,7 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
     assert "summary provider=deepseek" in result.stdout
     assert "runtime:" in result.stdout
     assert "download prerequisites:" in result.stdout
+    assert "effective download config:" in result.stdout
     assert "config risks:" in result.stdout
     assert "[INFO] download_selenium: effective download.selenium=off" in result.stdout
     assert "[INFO] download_cookies_from_browser: effective download.cookies_from_browser=edge" in result.stdout
@@ -199,8 +200,11 @@ def test_run_checks_reports_selenium_off_without_cookie_source(monkeypatch) -> N
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
     assert selenium_mode_check.ok is True
+    assert selenium_mode_check.section == "effective_download_config"
     assert selenium_mode_check.detail == "effective download.selenium=off"
+    assert browser_check.section == "effective_download_config"
     assert browser_check.detail == "effective download.cookies_from_browser=none"
+    assert cookie_file_check.section == "effective_download_config"
     assert cookie_file_check.detail == "effective download.cookie_file=none"
     assert risk_check.ok is True
     assert risk_check.code == "primary_auth_required"
@@ -222,6 +226,7 @@ def test_run_checks_reports_selenium_on_risk(monkeypatch) -> None:
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
     assert selenium_mode_check.ok is True
+    assert selenium_mode_check.section == "effective_download_config"
     assert selenium_mode_check.detail == "effective download.selenium=on"
     assert browser_check.detail == "effective download.cookies_from_browser=none"
     assert cookie_file_check.detail == "effective download.cookie_file=none"

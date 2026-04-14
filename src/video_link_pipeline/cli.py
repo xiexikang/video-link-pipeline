@@ -611,6 +611,7 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     sections = [
         ("runtime", "runtime:"),
         ("download_prerequisites", "download prerequisites:"),
+        ("effective_download_config", "effective download config:"),
         ("config_risks", "config risks:"),
     ]
     for section_key, section_title in sections:
@@ -622,7 +623,12 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
             _render_doctor_check(check)
 
     for check in checks:
-        if getattr(check, "section", "download_prerequisites") in {"runtime", "download_prerequisites", "config_risks"}:
+        if getattr(check, "section", "download_prerequisites") in {
+            "runtime",
+            "download_prerequisites",
+            "effective_download_config",
+            "config_risks",
+        }:
             continue
         _render_doctor_check(check)
 
