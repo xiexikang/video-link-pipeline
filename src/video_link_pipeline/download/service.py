@@ -196,6 +196,12 @@ def _record_fallback_prepare_warnings(result: dict[str, object], context: Seleni
         )
 
 
+def _apply_preparation_metadata(result: dict[str, object], preparation: DownloadPreparation) -> None:
+    result["title"] = preparation.title_hint
+    result["folder"] = str(preparation.output_dir)
+    result["ffmpeg_path"] = preparation.ffmpeg_path
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -522,13 +528,7 @@ def _retry_with_selenium_context(
     if origin:
         preparation.ydl_options["http_headers"]["Origin"] = origin
 
-    result.update(
-        {
-            "title": preparation.title_hint,
-            "folder": str(preparation.output_dir),
-            "ffmpeg_path": preparation.ffmpeg_path,
-        }
-    )
+    _apply_preparation_metadata(result, preparation)
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
     warnings = list(result.get("warnings") or [])
@@ -583,9 +583,7 @@ def execute_download(
             cookie_file=cookie_file,
         )
         preparation.output_dir.mkdir(parents=True, exist_ok=True)
-        result["title"] = preparation.title_hint
-        result["folder"] = str(preparation.output_dir)
-        result["ffmpeg_path"] = preparation.ffmpeg_path
+        _apply_preparation_metadata(result, preparation)
 
         artifacts = _execute_ydl_download(preparation)
         _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
