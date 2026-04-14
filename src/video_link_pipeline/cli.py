@@ -130,21 +130,30 @@ def _render_download_diagnostics(result: dict[str, object]) -> None:
     fallback_context = result.get("fallback_context")
     fallback_status = result.get("fallback_status")
     error_code = result.get("error_code")
+    error_stage = result.get("error_stage")
     if bool(result.get("used_selenium_fallback")):
         log.warning("download used selenium fallback")
     if fallback_status and fallback_status != "not_attempted":
-        log.info(f"fallback status={fallback_status}")
+        log.info(f"download fallback_status={fallback_status}")
     if error_code:
         log.info(f"download error_code={error_code}")
+    if error_stage:
+        log.info(f"download error_stage={error_stage}")
     if result.get("hint"):
         log.info(f"download hint={result['hint']}")
     if isinstance(fallback_context, dict):
         extraction_source = fallback_context.get("extraction_source")
         media_hint_url = fallback_context.get("media_hint_url")
+        canonical_url = fallback_context.get("canonical_url")
+        resolved_url = fallback_context.get("resolved_url")
         if extraction_source:
-            log.info(f"fallback extraction_source={extraction_source}")
+            log.info(f"download fallback_context.extraction_source={extraction_source}")
         if media_hint_url:
-            log.info(f"fallback media_hint_url={media_hint_url}")
+            log.info(f"download fallback_context.media_hint_url={media_hint_url}")
+        if canonical_url:
+            log.info(f"download fallback_context.canonical_url={canonical_url}")
+        if resolved_url:
+            log.info(f"download fallback_context.resolved_url={resolved_url}")
     if warning_details:
         for item in warning_details[:3]:
             code = item.get("code")
@@ -152,7 +161,7 @@ def _render_download_diagnostics(result: dict[str, object]) -> None:
             stage = item.get("stage")
             if code and message:
                 suffix = f" stage={stage}" if stage else ""
-                log.info(f"download warning[{code}]{suffix}: {message}")
+                log.info(f"download warning_code={code}{suffix}: {message}")
     else:
         for warning in warnings[:3]:
             log.info(f"download warning: {warning}")
