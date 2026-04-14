@@ -167,6 +167,16 @@ def _record_primary_download_warning(result: dict[str, object], error_message: s
     return warning_code
 
 
+def _fallback_exception_warning_code(exc: Exception) -> str:
+    if isinstance(exc, DependencyMissingError):
+        return "fallback_dependency_hint"
+    if isinstance(exc, SeleniumFallbackError):
+        return "fallback_prepare_hint"
+    if isinstance(exc, DownloadError):
+        return "fallback_retry_hint"
+    return "fallback_retry_unhandled_exception"
+
+
 def _classify_primary_warning(error_message: str) -> str:
     lowered = error_message.lower()
     if "403" in lowered or "forbidden" in lowered:
@@ -670,13 +680,7 @@ def _handle_download_failure(
                 _append_hint_warning(
                     result,
                     hint=exc.hint,
-                    default_code=(
-                        "fallback_dependency_hint"
-                        if isinstance(exc, DependencyMissingError)
-                        else "fallback_prepare_hint"
-                        if isinstance(exc, SeleniumFallbackError)
-                        else "fallback_retry_hint"
-                    ),
+                    default_code=_fallback_exception_warning_code(exc),
                     stage=str(result["error_stage"] or "download"),
                     overwrite_hint=False,
                 )
@@ -691,7 +695,7 @@ def _handle_download_failure(
             _append_hint_warning(
                 result,
                 hint=str(exc),
-                default_code="fallback_retry_unhandled_exception",
+                default_code=_fallback_exception_warning_code(exc),
                 stage="fallback_retry",
             )
         return result
