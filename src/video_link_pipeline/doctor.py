@@ -218,6 +218,15 @@ def _check_download_config_risks(config: dict[str, Any]) -> list[DoctorCheck]:
     selenium_mode = str(download_config.get("selenium") or "auto").strip().lower()
     checks: list[DoctorCheck] = []
 
+    checks.append(
+        DoctorCheck(
+            name="download_selenium",
+            ok=True,
+            detail=f"effective download.selenium={selenium_mode}",
+            section="config_risks",
+        )
+    )
+
     if browser and cookie_file:
         checks.append(
             DoctorCheck(
