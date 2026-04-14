@@ -312,6 +312,8 @@ If fallback successfully prepares a browser context, the common signals become:
 - `warning_details.code` contains `fallback_context_prepared`
 - `fallback_context.media_hint_url` and `fallback_context.extraction_source` can be used to analyze extractor quality per site
 
+These `warning_details.code` values and `vlp doctor` guidance are backed by the same shared diagnostics catalog in `video_link_pipeline.download.diagnostics`. New warning codes should be added there first so doctor, manifest output, and docs stay aligned.
+
 ## Compatibility Wrappers
 
 These script entry points are still available:
