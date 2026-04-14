@@ -72,16 +72,34 @@ def doctor_guidance(checks: list[DoctorCheck]) -> list[str]:
     return lines
 
 
-def doctor_reference_lines() -> list[str]:
+def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]:
     lines: list[str] = []
-    wanted = set(COMMON_DOCTOR_WARNING_CODES)
+    prioritized_codes = [
+        check.code
+        for check in (checks or [])
+        if check.code and check.code in COMMON_DOCTOR_WARNING_CODES
+    ]
+    wanted = list(dict.fromkeys(prioritized_codes + COMMON_DOCTOR_WARNING_CODES))
+    wanted_set = set(wanted)
+    rendered: set[str] = set()
     for entry in warning_catalog():
-        if entry.code not in wanted:
+        if entry.code not in wanted_set:
             continue
+        rendered.add(entry.code)
         lines.append(f"{entry.code}: {entry.description}")
         if entry.remediation:
             lines.append(f"{entry.code} fix: {entry.remediation}")
-    return lines
+    ordered_lines: list[str] = []
+    for code in wanted:
+        if code not in rendered:
+            continue
+        description = warning_code_description(code)
+        remediation = warning_code_remediation(code)
+        if description:
+            ordered_lines.append(f"{code}: {description}")
+        if remediation:
+            ordered_lines.append(f"{code} fix: {remediation}")
+    return ordered_lines
 
 
 def _check_python_runtime() -> DoctorCheck:

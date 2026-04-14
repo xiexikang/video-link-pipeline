@@ -187,6 +187,32 @@ def test_doctor_reference_lines_include_common_codes_and_fixes() -> None:
     assert any(line.startswith("fallback_media_hint_missing:") for line in lines)
 
 
+def test_doctor_reference_lines_prioritize_current_check_codes() -> None:
+    checks = [
+        __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+            name="ffmpeg",
+            ok=False,
+            detail="ffmpeg missing",
+            code="ffmpeg_unavailable",
+        ),
+        __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+            name="cookies",
+            ok=True,
+            detail="configured browser cookies source: chrome",
+            code="browser_cookie_locked",
+        ),
+    ]
+
+    lines = doctor_reference_lines(checks)
+    ffmpeg_description = "ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail."
+    primary_auth_description = "primary_auth_required: Primary download requires login or account access."
+
+    assert lines[0] == ffmpeg_description
+    assert any(line.startswith("ffmpeg_unavailable fix:") for line in lines[:3])
+    assert any(line.startswith("browser_cookie_locked:") for line in lines[:4])
+    assert lines.index(ffmpeg_description) < lines.index(primary_auth_description)
+
+
 def test_run_checks_reports_conflicting_cookie_sources(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr("video_link_pipeline.doctor.resolve_ffmpeg_executable", lambda: "C:/ffmpeg/bin/ffmpeg.exe")
     monkeypatch.setattr("video_link_pipeline.doctor.shutil.which", lambda _: "C:/ffmpeg/bin/ffmpeg.exe")

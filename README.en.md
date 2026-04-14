@@ -49,7 +49,7 @@ pip install -e .[dev]
 `vlp doctor` currently highlights:
 
 - grouped output sections such as `runtime`, `download prerequisites`, `effective download config`, `config risks`, and `common diagnostic guidance`
-- a `known diagnostic codes` section that summarizes common download warning codes and suggested fixes
+- a `known diagnostic codes` section that prioritizes codes hit by the current checks, then supplements them with a small set of common download warning codes and fixes
 - the final FFmpeg selection source and path, such as system `ffmpeg` or `imageio-ffmpeg`
 - whether the Selenium extra is fully available
 - the current effective `download.selenium` mode, such as `auto`, `on`, or `off`
