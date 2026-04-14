@@ -10,6 +10,7 @@ from video_link_pipeline.download.selenium_fallback import (
 )
 from video_link_pipeline.download.service import (
     _append_hint_warning,
+    _build_fallback_context,
     _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
@@ -98,6 +99,32 @@ def test_record_primary_download_warning_sets_warning_details_and_hint() -> None
     assert result["warning_details"][0]["stage"] == "primary_download"
     assert "triggered selenium fallback" in result["warning_details"][0]["message"]
     assert "Try browser cookies" in str(result["hint"])
+
+
+def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) -> None:
+    context = SeleniumContext(
+        original_url="https://example.com/video",
+        resolved_url="https://example.com/resolved",
+        page_title="demo",
+        user_agent="ua",
+        referer="https://example.com/resolved",
+        cookie_file=tmp_path / "cookies.txt",
+        page_description="page description",
+        canonical_url="https://example.com/watch/demo",
+        media_hint_url="https://cdn.example.com/media.m3u8",
+        site_name="example.com",
+        extraction_source="jsonld:contentUrl",
+    )
+
+    fallback_context = _build_fallback_context(context)
+
+    assert fallback_context == {
+        "resolved_url": "https://example.com/resolved",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://cdn.example.com/media.m3u8",
+        "site_name": "example.com",
+        "extraction_source": "jsonld:contentUrl",
+    }
 
 
 def test_append_hint_warning_does_not_override_existing_hint_by_default() -> None:
