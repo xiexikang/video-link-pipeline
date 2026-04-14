@@ -177,6 +177,25 @@ def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
     }
 
 
+def _record_fallback_prepare_warnings(result: dict[str, object], context: SeleniumContext) -> None:
+    _append_warning(
+        result,
+        code="fallback_context_prepared",
+        message=f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}",
+        stage="fallback_prepare",
+    )
+    if not context.media_hint_url or context.media_hint_url in {
+        context.resolved_url,
+        context.canonical_url,
+    }:
+        _append_warning(
+            result,
+            code="fallback_media_hint_missing",
+            message="selenium fallback did not extract an explicit media URL and will retry with the resolved page URL",
+            stage="fallback_prepare",
+        )
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -513,22 +532,7 @@ def _retry_with_selenium_context(
     if context.page_description and not result.get("error"):
         result["error"] = context.page_description
     warnings = list(result.get("warnings") or [])
-    _append_warning(
-        result,
-        code="fallback_context_prepared",
-        message=f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}",
-        stage="fallback_prepare",
-    )
-    if not context.media_hint_url or context.media_hint_url in {
-        context.resolved_url,
-        context.canonical_url,
-    }:
-        _append_warning(
-            result,
-            code="fallback_media_hint_missing",
-            message="selenium fallback did not extract an explicit media URL and will retry with the resolved page URL",
-            stage="fallback_prepare",
-        )
+    _record_fallback_prepare_warnings(result, context)
     result["fallback_context"] = _build_fallback_context(context)
     result["fallback_status"] = "prepared"
 

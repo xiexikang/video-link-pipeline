@@ -15,6 +15,7 @@ from video_link_pipeline.download.service import (
     _classify_hint_warning,
     _classify_primary_warning,
     _origin_from_url,
+    _record_fallback_prepare_warnings,
     _record_primary_download_warning,
     _retry_with_selenium_context,
     _set_failure_state,
@@ -125,6 +126,28 @@ def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) ->
         "site_name": "example.com",
         "extraction_source": "jsonld:contentUrl",
     }
+
+
+def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
+    result = {"warnings": [], "warning_details": []}
+    context = SeleniumContext(
+        original_url="https://example.com/video",
+        resolved_url="https://example.com/watch/demo",
+        page_title="demo",
+        user_agent="ua",
+        referer="https://example.com/watch/demo",
+        cookie_file=tmp_path / "cookies.txt",
+        page_description="page description",
+        canonical_url="https://example.com/watch/demo",
+        media_hint_url="https://example.com/watch/demo",
+        site_name="example.com",
+        extraction_source="dom",
+    )
+
+    _record_fallback_prepare_warnings(result, context)
+
+    codes = [item["code"] for item in result["warning_details"]]
+    assert codes == ["fallback_context_prepared", "fallback_media_hint_missing"]
 
 
 def test_append_hint_warning_does_not_override_existing_hint_by_default() -> None:
