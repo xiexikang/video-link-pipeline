@@ -82,6 +82,18 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
                 section="config_risks",
             ),
             __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_cookies_from_browser",
+                ok=True,
+                detail="effective download.cookies_from_browser=edge",
+                section="config_risks",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_cookie_file",
+                ok=True,
+                detail="effective download.cookie_file=none",
+                section="config_risks",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
                 name="download_config",
                 ok=True,
                 detail="download selenium=off and no cookie source is configured",
@@ -99,6 +111,8 @@ def test_doctor_command_prints_summary_provider(monkeypatch, tmp_path: Path) -> 
     assert "download prerequisites:" in result.stdout
     assert "config risks:" in result.stdout
     assert "[INFO] download_selenium: effective download.selenium=off" in result.stdout
+    assert "[INFO] download_cookies_from_browser: effective download.cookies_from_browser=edge" in result.stdout
+    assert "[INFO] download_cookie_file: effective download.cookie_file=none" in result.stdout
     assert "[INFO] download_config: download selenium=off and no cookie source is configured" in result.stdout
     assert "doctor checks passed" in result.stdout
 
@@ -180,10 +194,14 @@ def test_run_checks_reports_selenium_off_without_cookie_source(monkeypatch) -> N
 
     checks = run_checks({"download": {"selenium": "off"}})
     selenium_mode_check = next(check for check in checks if check.name == "download_selenium")
+    browser_check = next(check for check in checks if check.name == "download_cookies_from_browser")
+    cookie_file_check = next(check for check in checks if check.name == "download_cookie_file")
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
     assert selenium_mode_check.ok is True
     assert selenium_mode_check.detail == "effective download.selenium=off"
+    assert browser_check.detail == "effective download.cookies_from_browser=none"
+    assert cookie_file_check.detail == "effective download.cookie_file=none"
     assert risk_check.ok is True
     assert risk_check.code == "primary_auth_required"
     assert risk_check.hint == warning_code_remediation("primary_auth_required")
@@ -199,10 +217,14 @@ def test_run_checks_reports_selenium_on_risk(monkeypatch) -> None:
 
     checks = run_checks({"download": {"selenium": "on"}})
     selenium_mode_check = next(check for check in checks if check.name == "download_selenium")
+    browser_check = next(check for check in checks if check.name == "download_cookies_from_browser")
+    cookie_file_check = next(check for check in checks if check.name == "download_cookie_file")
     risk_check = next(check for check in checks if check.name == "download_config" and check.section == "config_risks")
 
     assert selenium_mode_check.ok is True
     assert selenium_mode_check.detail == "effective download.selenium=on"
+    assert browser_check.detail == "effective download.cookies_from_browser=none"
+    assert cookie_file_check.detail == "effective download.cookie_file=none"
     assert risk_check.ok is True
     assert risk_check.code == "browser_driver_unavailable"
     assert risk_check.hint == warning_code_remediation("browser_driver_unavailable")
@@ -217,8 +239,12 @@ def test_run_checks_reports_missing_cookie_file(monkeypatch, tmp_path: Path) -> 
     )
 
     checks = run_checks({"download": {"cookie_file": str(tmp_path / "missing-cookies.txt")}})
+    browser_check = next(check for check in checks if check.name == "download_cookies_from_browser")
+    cookie_file_value_check = next(check for check in checks if check.name == "download_cookie_file")
     cookies_check = next(check for check in checks if check.name == "cookies")
 
+    assert browser_check.detail == "effective download.cookies_from_browser=none"
+    assert cookie_file_value_check.detail == f"effective download.cookie_file={tmp_path / 'missing-cookies.txt'}"
     assert cookies_check.ok is False
     assert "exists=no" in cookies_check.detail
     assert "Netscape-format cookies.txt" in str(cookies_check.hint)
@@ -233,8 +259,12 @@ def test_run_checks_reports_unknown_browser_cookie_source(monkeypatch) -> None:
     )
 
     checks = run_checks({"download": {"cookies_from_browser": "unknown-browser"}})
+    browser_check = next(check for check in checks if check.name == "download_cookies_from_browser")
+    cookie_file_check = next(check for check in checks if check.name == "download_cookie_file")
     cookies_check = next(check for check in checks if check.name == "cookies")
 
+    assert browser_check.detail == "effective download.cookies_from_browser=unknown-browser"
+    assert cookie_file_check.detail == "effective download.cookie_file=none"
     assert cookies_check.ok is False
     assert "not recognized" in cookies_check.detail
     assert "supported browsers" in str(cookies_check.hint)
