@@ -90,6 +90,56 @@ def _apply_warning_remediation(result: dict[str, object], code: str, *, overwrit
     _set_result_hint(result, preferred_warning_hint(code), overwrite=overwrite)
 
 
+def _set_failure_state(
+    result: dict[str, object],
+    *,
+    error: str,
+    error_code: str,
+    error_stage: str,
+    fallback_status: str | None = None,
+) -> None:
+    result["error"] = error
+    result["error_code"] = error_code
+    result["error_stage"] = error_stage
+    if fallback_status is not None:
+        result["fallback_status"] = fallback_status
+
+
+def _append_hint_warning(
+    result: dict[str, object],
+    *,
+    hint: str,
+    default_code: str,
+    stage: str,
+    overwrite_hint: bool = False,
+) -> str:
+    warning_code = _classify_hint_warning(hint, default_code=default_code)
+    _append_warning(
+        result,
+        code=warning_code,
+        message=hint,
+        stage=stage,
+    )
+    _set_result_hint(
+        result,
+        preferred_warning_hint(warning_code, hint),
+        overwrite=overwrite_hint,
+    )
+    return warning_code
+
+
+def _record_primary_download_warning(result: dict[str, object], error_message: str) -> str:
+    warning_code = _classify_primary_warning(error_message)
+    _append_warning(
+        result,
+        code=warning_code,
+        message=f"primary download failed and triggered selenium fallback: {error_message}",
+        stage="primary_download",
+    )
+    _apply_warning_remediation(result, warning_code)
+    return warning_code
+
+
 def _classify_primary_warning(error_message: str) -> str:
     lowered = error_message.lower()
     if "403" in lowered or "forbidden" in lowered:
@@ -524,9 +574,12 @@ def execute_download(
             audio_only=audio_only,
         )
     except DownloadError as exc:
-        result["error"] = exc.message
-        result["error_code"] = "DOWNLOAD_PRIMARY_FAILED"
-        result["error_stage"] = "primary_download"
+        _set_failure_state(
+            result,
+            error=exc.message,
+            error_code="DOWNLOAD_PRIMARY_FAILED",
+            error_stage="primary_download",
+        )
         return _handle_download_failure(
             result=result,
             output_dir=output_dir,
@@ -536,9 +589,12 @@ def execute_download(
             audio_only=audio_only,
         )
     except Exception as exc:
-        result["error"] = str(exc)
-        result["error_code"] = "DOWNLOAD_PRIMARY_FAILED"
-        result["error_stage"] = "primary_download"
+        _set_failure_state(
+            result,
+            error=str(exc),
+            error_code="DOWNLOAD_PRIMARY_FAILED",
+            error_stage="primary_download",
+        )
         return _handle_download_failure(
             result=result,
             output_dir=output_dir,
@@ -562,13 +618,7 @@ def _handle_download_failure(
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
         return result
     result["fallback_status"] = "triggered"
-    _append_warning(
-        result,
-        code=_classify_primary_warning(error_message),
-        message=f"primary download failed and triggered selenium fallback: {error_message}",
-        stage="primary_download",
-    )
-    _apply_warning_remediation(result, _classify_primary_warning(error_message))
+    _record_primary_download_warning(result, error_message)
 
     try:
         context = run_selenium_browser_context(
@@ -586,27 +636,35 @@ def _handle_download_failure(
     except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:
         result["used_selenium_fallback"] = False
         if isinstance(exc, VlpError):
-            result["error"] = exc.message
             if isinstance(exc, DependencyMissingError):
-                result["error_code"] = "DEPENDENCY_MISSING"
-                result["error_stage"] = "fallback_dependency"
-                result["fallback_status"] = "dependency_missing"
-                _set_result_hint(
+                _set_failure_state(
                     result,
-                    preferred_warning_hint("browser_driver_unavailable", exc.hint),
-                    overwrite=True,
+                    error=exc.message,
+                    error_code="DEPENDENCY_MISSING",
+                    error_stage="fallback_dependency",
+                    fallback_status="dependency_missing",
                 )
+                _set_result_hint(result, preferred_warning_hint("browser_driver_unavailable", exc.hint), overwrite=True)
             elif isinstance(exc, SeleniumFallbackError):
-                result["error_code"] = "DOWNLOAD_FALLBACK_PREPARE_FAILED"
-                result["error_stage"] = "fallback_prepare"
-                result["fallback_status"] = "prepare_failed"
+                _set_failure_state(
+                    result,
+                    error=exc.message,
+                    error_code="DOWNLOAD_FALLBACK_PREPARE_FAILED",
+                    error_stage="fallback_prepare",
+                    fallback_status="prepare_failed",
+                )
             elif isinstance(exc, DownloadError):
-                result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
-                result["error_stage"] = "fallback_retry"
-                result["fallback_status"] = "retry_failed"
+                _set_failure_state(
+                    result,
+                    error=exc.message,
+                    error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
+                    error_stage="fallback_retry",
+                    fallback_status="retry_failed",
+                )
             if exc.hint:
-                warning_code = _classify_hint_warning(
-                    exc.hint,
+                _append_hint_warning(
+                    result,
+                    hint=exc.hint,
                     default_code=(
                         "fallback_dependency_hint"
                         if isinstance(exc, DependencyMissingError)
@@ -614,34 +672,22 @@ def _handle_download_failure(
                         if isinstance(exc, SeleniumFallbackError)
                         else "fallback_retry_hint"
                     ),
-                )
-                _append_warning(
-                    result,
-                    code=warning_code,
-                    message=exc.hint,
                     stage=str(result["error_stage"] or "download"),
+                    overwrite_hint=False,
                 )
-                if not isinstance(exc, DependencyMissingError):
-                    _set_result_hint(
-                        result,
-                        preferred_warning_hint(warning_code, exc.hint),
-                        overwrite=False,
-                    )
         else:
-            result["error"] = str(exc)
-            result["error_code"] = "DOWNLOAD_FALLBACK_RETRY_FAILED"
-            result["error_stage"] = "fallback_retry"
-            result["fallback_status"] = "retry_failed"
-            _append_warning(
+            _set_failure_state(
                 result,
-                code="fallback_retry_unhandled_exception",
-                message=str(exc),
-                stage="fallback_retry",
+                error=str(exc),
+                error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
+                error_stage="fallback_retry",
+                fallback_status="retry_failed",
             )
-            _set_result_hint(
+            _append_hint_warning(
                 result,
-                preferred_warning_hint("fallback_retry_unhandled_exception", str(exc)),
-                overwrite=False,
+                hint=str(exc),
+                default_code="fallback_retry_unhandled_exception",
+                stage="fallback_retry",
             )
         return result
 
