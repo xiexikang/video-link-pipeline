@@ -11,6 +11,7 @@ from typing import Any
 
 from .download.diagnostics import (
     preferred_warning_hint,
+    warning_catalog,
     warning_code_description,
     warning_code_remediation,
 )
@@ -28,6 +29,16 @@ class DoctorCheck:
     section: str = "download_prerequisites"
     code: str | None = None
     hint: str | None = None
+
+
+COMMON_DOCTOR_WARNING_CODES = [
+    "browser_cookie_locked",
+    "browser_driver_unavailable",
+    "ffmpeg_unavailable",
+    "primary_auth_required",
+    "primary_http_403",
+    "fallback_media_hint_missing",
+]
 
 
 def run_checks(config: dict[str, Any] | None = None) -> list[DoctorCheck]:
@@ -58,6 +69,18 @@ def doctor_guidance(checks: list[DoctorCheck]) -> list[str]:
         if remediation:
             lines.append(f"{check.code} fix: {remediation}")
         seen.add(check.code)
+    return lines
+
+
+def doctor_reference_lines() -> list[str]:
+    lines: list[str] = []
+    wanted = set(COMMON_DOCTOR_WARNING_CODES)
+    for entry in warning_catalog():
+        if entry.code not in wanted:
+            continue
+        lines.append(f"{entry.code}: {entry.description}")
+        if entry.remediation:
+            lines.append(f"{entry.code} fix: {entry.remediation}")
     return lines
 
 

@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from video_link_pipeline.cli import app
 from video_link_pipeline.download.diagnostics import warning_code_remediation
-from video_link_pipeline.doctor import doctor_guidance, run_checks
+from video_link_pipeline.doctor import doctor_guidance, doctor_reference_lines, run_checks
 
 runner = CliRunner()
 
@@ -170,8 +170,21 @@ def test_doctor_command_prints_diagnostic_guidance(monkeypatch, tmp_path: Path) 
     assert result.exit_code == 0
     assert "download prerequisites:" in result.stdout
     assert "common diagnostic guidance:" in result.stdout
+    assert "known diagnostic codes:" in result.stdout
     assert "ffmpeg_unavailable" in result.stdout
     assert "browser_cookie_locked" in result.stdout
+
+
+def test_doctor_reference_lines_include_common_codes_and_fixes() -> None:
+    lines = doctor_reference_lines()
+
+    assert any(line.startswith("browser_cookie_locked:") for line in lines)
+    assert any(line.startswith("browser_cookie_locked fix:") for line in lines)
+    assert any(line.startswith("browser_driver_unavailable:") for line in lines)
+    assert any(line.startswith("ffmpeg_unavailable:") for line in lines)
+    assert any(line.startswith("primary_auth_required:") for line in lines)
+    assert any(line.startswith("primary_http_403:") for line in lines)
+    assert any(line.startswith("fallback_media_hint_missing:") for line in lines)
 
 
 def test_run_checks_reports_conflicting_cookie_sources(monkeypatch, tmp_path: Path) -> None:
