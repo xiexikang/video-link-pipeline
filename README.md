@@ -53,6 +53,7 @@ pip install -e .[dev]
 - Selenium extra 是否完整可用
 - 当前有效的 `download.selenium` 模式，例如 `auto`、`on`、`off`
 - 当前有效的 `download.cookies_from_browser` 和 `download.cookie_file` 值
+- 一条紧凑的 effective download config 摘要，便于快速看清 `selenium`、浏览器 cookies 和 cookie 文件的最终组合
 - cookies 配置是浏览器提取还是文件路径
 - `download.selenium`、`cookies_from_browser`、`cookie_file` 的组合风险或冲突
 - 对常见 Windows 锁库、驱动缺失、FFmpeg 缺失问题的修复建议
