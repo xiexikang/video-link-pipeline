@@ -467,7 +467,7 @@ Representative warning codes include:
 - Reports availability and selected executable paths
 - Groups output into `runtime`, `download prerequisites`, `effective download config`, and `config risks`
 - Provides a compact effective download config summary line for quick inspection of the final selenium and cookies combination
-- Prints a small built-in reference of common diagnostic codes and remediations for quick operator lookup
+- Prints a small built-in reference of common diagnostic codes and remediations, prioritizing codes hit by the current checks for quicker operator lookup
 - Shows the effective `download.selenium` mode directly in doctor output
 - Shows the effective `download.cookies_from_browser` and `download.cookie_file` values directly in doctor output
 - Checks risky download config combinations such as conflicting cookie sources

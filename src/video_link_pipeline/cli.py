@@ -591,7 +591,7 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
     log.info(f"summary provider={redacted['summary']['provider']}")
     checks = run_checks(bundle.effective_config)
     guidance = doctor_guidance(checks)
-    reference_lines = doctor_reference_lines()
+    reference_lines = doctor_reference_lines(checks)
 
     has_failures = False
 
