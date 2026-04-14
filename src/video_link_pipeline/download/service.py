@@ -202,6 +202,17 @@ def _apply_preparation_metadata(result: dict[str, object], preparation: Download
     result["ffmpeg_path"] = preparation.ffmpeg_path
 
 
+def _build_retry_headers(context: SeleniumContext) -> dict[str, str]:
+    headers = {
+        "User-Agent": context.user_agent,
+        "Referer": context.canonical_url or context.referer,
+    }
+    origin = _origin_from_url(context.canonical_url or context.resolved_url)
+    if origin:
+        headers["Origin"] = origin
+    return headers
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -520,13 +531,7 @@ def _retry_with_selenium_context(
         cookie_file=context.cookie_file,
     )
     preparation.output_dir.mkdir(parents=True, exist_ok=True)
-    origin = _origin_from_url(context.canonical_url or context.resolved_url)
-    preparation.ydl_options["http_headers"] = {
-        "User-Agent": context.user_agent,
-        "Referer": context.canonical_url or context.referer,
-    }
-    if origin:
-        preparation.ydl_options["http_headers"]["Origin"] = origin
+    preparation.ydl_options["http_headers"] = _build_retry_headers(context)
 
     _apply_preparation_metadata(result, preparation)
     if context.page_description and not result.get("error"):
