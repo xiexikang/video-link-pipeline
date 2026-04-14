@@ -10,6 +10,7 @@ from video_link_pipeline.download.selenium_fallback import (
 )
 from video_link_pipeline.download.service import (
     _append_hint_warning,
+    _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
     _origin_from_url,
@@ -19,6 +20,7 @@ from video_link_pipeline.download.service import (
     execute_download,
     new_download_result,
 )
+from video_link_pipeline.errors import DependencyMissingError
 
 
 def test_should_attempt_selenium_fallback_auto_only_for_anti_crawl_errors() -> None:
@@ -55,6 +57,13 @@ def test_classify_hint_warning_covers_shared_dependency_cases() -> None:
     assert _classify_hint_warning("chromedriver could not be found", default_code="fallback_retry_hint") == "browser_driver_unavailable"
     assert _classify_hint_warning("ffmpeg is required for merge", default_code="fallback_retry_hint") == "ffmpeg_unavailable"
     assert _classify_hint_warning("some custom retry hint", default_code="fallback_retry_hint") == "fallback_retry_hint"
+
+
+def test_fallback_exception_warning_code_maps_exception_types() -> None:
+    assert _fallback_exception_warning_code(DependencyMissingError("missing", hint="install selenium")) == "fallback_dependency_hint"
+    assert _fallback_exception_warning_code(__import__("video_link_pipeline.download.selenium_fallback", fromlist=["SeleniumFallbackError"]).SeleniumFallbackError("prepare failed")) == "fallback_prepare_hint"
+    assert _fallback_exception_warning_code(__import__("video_link_pipeline.download.service", fromlist=["DownloadError"]).DownloadError("retry failed")) == "fallback_retry_hint"
+    assert _fallback_exception_warning_code(RuntimeError("unexpected")) == "fallback_retry_unhandled_exception"
 
 
 def test_set_failure_state_updates_result_consistently() -> None:
