@@ -167,6 +167,16 @@ def _record_primary_download_warning(result: dict[str, object], error_message: s
     return warning_code
 
 
+def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
+    return {
+        "resolved_url": context.resolved_url,
+        "canonical_url": context.canonical_url,
+        "media_hint_url": context.media_hint_url,
+        "site_name": context.site_name,
+        "extraction_source": context.extraction_source,
+    }
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -519,13 +529,7 @@ def _retry_with_selenium_context(
             message="selenium fallback did not extract an explicit media URL and will retry with the resolved page URL",
             stage="fallback_prepare",
         )
-    result["fallback_context"] = {
-        "resolved_url": context.resolved_url,
-        "canonical_url": context.canonical_url,
-        "media_hint_url": context.media_hint_url,
-        "site_name": context.site_name,
-        "extraction_source": context.extraction_source,
-    }
+    result["fallback_context"] = _build_fallback_context(context)
     result["fallback_status"] = "prepared"
 
     artifacts = _execute_ydl_download(preparation)
