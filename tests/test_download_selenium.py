@@ -17,6 +17,7 @@ from video_link_pipeline.download.service import (
     _retry_with_selenium_context,
     _set_failure_state,
     execute_download,
+    new_download_result,
 )
 
 
@@ -25,6 +26,20 @@ def test_should_attempt_selenium_fallback_auto_only_for_anti_crawl_errors() -> N
     assert should_attempt_selenium_fallback("auto", "network timeout") is False
     assert should_attempt_selenium_fallback("off", "403 forbidden") is False
     assert should_attempt_selenium_fallback("on", "anything") is True
+
+
+def test_new_download_result_provides_stable_default_shape() -> None:
+    result = new_download_result("https://example.com/video")
+
+    assert result["success"] is False
+    assert result["url"] == "https://example.com/video"
+    assert result["fallback_status"] == "not_attempted"
+    assert result["error_code"] is None
+    assert result["error_stage"] is None
+    assert result["warnings"] == []
+    assert result["warning_details"] == []
+    assert result["fallback_context"] is None
+    assert result["hint"] is None
 
 
 def test_classify_primary_warning_covers_common_cases() -> None:

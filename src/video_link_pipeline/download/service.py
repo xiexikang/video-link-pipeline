@@ -47,6 +47,33 @@ class DownloadError(VlpError):
         super().__init__(message=message, error_code="DOWNLOAD_FAILED", hint=hint)
 
 
+def new_download_result(url: str) -> dict[str, object]:
+    """Build the default structured result payload for one download attempt."""
+    return {
+        "success": False,
+        "url": url,
+        "title": None,
+        "folder": None,
+        "video": None,
+        "audio": None,
+        "subtitle": None,
+        "subtitle_vtt": None,
+        "subtitle_srt": None,
+        "info": None,
+        "needs_whisper": False,
+        "used_selenium_fallback": False,
+        "ffmpeg_path": None,
+        "error_code": None,
+        "error_stage": None,
+        "fallback_status": "not_attempted",
+        "warnings": [],
+        "warning_details": [],
+        "fallback_context": None,
+        "error": None,
+        "hint": None,
+    }
+
+
 def _warning_details(result: dict[str, object]) -> list[dict[str, str]]:
     details = result.get("warning_details")
     if not isinstance(details, list):
@@ -525,29 +552,7 @@ def execute_download(
     selenium_mode: str = "auto",
 ) -> dict[str, object]:
     """Run the primary yt-dlp download path and return a structured result."""
-    result: dict[str, object] = {
-        "success": False,
-        "url": url,
-        "title": None,
-        "folder": None,
-        "video": None,
-        "audio": None,
-        "subtitle": None,
-        "subtitle_vtt": None,
-        "subtitle_srt": None,
-        "info": None,
-        "needs_whisper": False,
-        "used_selenium_fallback": False,
-        "ffmpeg_path": None,
-        "error_code": None,
-        "error_stage": None,
-        "fallback_status": "not_attempted",
-        "warnings": [],
-        "warning_details": [],
-        "fallback_context": None,
-        "error": None,
-        "hint": None,
-    }
+    result = new_download_result(url)
 
     try:
         preparation = probe_download(
