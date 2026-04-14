@@ -73,7 +73,6 @@ def doctor_guidance(checks: list[DoctorCheck]) -> list[str]:
 
 
 def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]:
-    lines: list[str] = []
     prioritized_codes = [
         check.code
         for check in (checks or [])
@@ -86,9 +85,6 @@ def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]
         if entry.code not in wanted_set:
             continue
         rendered.add(entry.code)
-        lines.append(f"{entry.code}: {entry.description}")
-        if entry.remediation:
-            lines.append(f"{entry.code} fix: {entry.remediation}")
     ordered_lines: list[str] = []
     for code in wanted:
         if code not in rendered:
@@ -100,6 +96,18 @@ def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]
         if remediation:
             ordered_lines.append(f"{code} fix: {remediation}")
     return ordered_lines
+
+
+def doctor_reference_lines_for_remaining_codes(checks: list[DoctorCheck]) -> list[str]:
+    active_codes = {check.code for check in checks if check.code}
+    lines: list[str] = []
+    for line in doctor_reference_lines(checks):
+        code_prefix = line.split(":", 1)[0]
+        code = code_prefix.removesuffix(" fix")
+        if code in active_codes:
+            continue
+        lines.append(line)
+    return lines
 
 
 def _check_python_runtime() -> DoctorCheck:

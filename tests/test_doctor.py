@@ -7,7 +7,12 @@ from typer.testing import CliRunner
 
 from video_link_pipeline.cli import app
 from video_link_pipeline.download.diagnostics import warning_code_remediation
-from video_link_pipeline.doctor import doctor_guidance, doctor_reference_lines, run_checks
+from video_link_pipeline.doctor import (
+    doctor_guidance,
+    doctor_reference_lines,
+    doctor_reference_lines_for_remaining_codes,
+    run_checks,
+)
 
 runner = CliRunner()
 
@@ -211,6 +216,30 @@ def test_doctor_reference_lines_prioritize_current_check_codes() -> None:
     assert any(line.startswith("ffmpeg_unavailable fix:") for line in lines[:3])
     assert any(line.startswith("browser_cookie_locked:") for line in lines[:4])
     assert lines.index(ffmpeg_description) < lines.index(primary_auth_description)
+
+
+def test_doctor_reference_lines_for_remaining_codes_excludes_active_codes() -> None:
+    checks = [
+        __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+            name="ffmpeg",
+            ok=False,
+            detail="ffmpeg missing",
+            code="ffmpeg_unavailable",
+        ),
+        __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+            name="cookies",
+            ok=True,
+            detail="configured browser cookies source: chrome",
+            code="browser_cookie_locked",
+        ),
+    ]
+
+    lines = doctor_reference_lines_for_remaining_codes(checks)
+
+    assert not any(line.startswith("ffmpeg_unavailable:") for line in lines)
+    assert not any(line.startswith("browser_cookie_locked:") for line in lines)
+    assert any(line.startswith("primary_auth_required:") for line in lines)
+    assert any(line.startswith("primary_http_403:") for line in lines)
 
 
 def test_run_checks_reports_conflicting_cookie_sources(monkeypatch, tmp_path: Path) -> None:
