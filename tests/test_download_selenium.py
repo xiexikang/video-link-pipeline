@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from video_link_pipeline.download.cookies import CookieSource
 from video_link_pipeline.download.selenium_fallback import (
     SeleniumContext,
     choose_best_media_hint,
@@ -10,6 +11,7 @@ from video_link_pipeline.download.selenium_fallback import (
 )
 from video_link_pipeline.download.service import (
     _append_hint_warning,
+    _apply_preparation_metadata,
     _build_fallback_context,
     _fallback_exception_warning_code,
     _classify_hint_warning,
@@ -19,6 +21,7 @@ from video_link_pipeline.download.service import (
     _record_primary_download_warning,
     _retry_with_selenium_context,
     _set_failure_state,
+    DownloadPreparation,
     execute_download,
     new_download_result,
 )
@@ -126,6 +129,25 @@ def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) ->
         "site_name": "example.com",
         "extraction_source": "jsonld:contentUrl",
     }
+
+
+def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+    preparation = DownloadPreparation(
+        url="https://example.com/video",
+        output_root=tmp_path,
+        output_dir=tmp_path / "job",
+        title_hint="demo-title",
+        cookie_source=CookieSource(browser=None, cookie_file=None),
+        ffmpeg_path="C:/ffmpeg/bin/ffmpeg.exe",
+        ydl_options={},
+    )
+
+    _apply_preparation_metadata(result, preparation)
+
+    assert result["title"] == "demo-title"
+    assert result["folder"] == str(tmp_path / "job")
+    assert result["ffmpeg_path"] == "C:/ffmpeg/bin/ffmpeg.exe"
 
 
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
