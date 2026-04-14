@@ -15,6 +15,7 @@ from video_link_pipeline.download.service import (
     _build_fallback_context,
     _build_retry_headers,
     _prepare_retry_download,
+    _record_retry_context_state,
     _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
@@ -224,6 +225,36 @@ def test_prepare_retry_download_applies_probe_headers_and_metadata(monkeypatch, 
     assert result["title"] == "demo"
     assert result["folder"] == str(tmp_path / "job")
     assert result["ffmpeg_path"] == "ffmpeg"
+
+
+def test_record_retry_context_state_updates_description_context_and_status(tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+    context = SeleniumContext(
+        original_url="https://example.com/video",
+        resolved_url="https://example.com/resolved",
+        page_title="demo",
+        user_agent="mobile-ua",
+        referer="https://example.com/fallback-referrer",
+        cookie_file=tmp_path / "cookies.txt",
+        page_description="page description",
+        canonical_url="https://example.com/watch/demo",
+        media_hint_url="https://cdn.example.com/media.m3u8",
+        site_name="example.com",
+        extraction_source="jsonld:contentUrl",
+    )
+
+    _record_retry_context_state(result, context)
+
+    assert result["error"] == "page description"
+    assert result["fallback_status"] == "prepared"
+    assert result["fallback_context"] == {
+        "resolved_url": "https://example.com/resolved",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://cdn.example.com/media.m3u8",
+        "site_name": "example.com",
+        "extraction_source": "jsonld:contentUrl",
+    }
+    assert result["warning_details"][0]["code"] == "fallback_context_prepared"
 
 
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:

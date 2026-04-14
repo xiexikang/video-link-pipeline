@@ -237,6 +237,14 @@ def _prepare_retry_download(
     return preparation
 
 
+def _record_retry_context_state(result: dict[str, object], context: SeleniumContext) -> None:
+    if context.page_description and not result.get("error"):
+        result["error"] = context.page_description
+    _record_fallback_prepare_warnings(result, context)
+    result["fallback_context"] = _build_fallback_context(context)
+    result["fallback_status"] = "prepared"
+
+
 def _fallback_exception_warning_code(exc: Exception) -> str:
     if isinstance(exc, DependencyMissingError):
         return "fallback_dependency_hint"
@@ -553,12 +561,7 @@ def _retry_with_selenium_context(
         audio_only=audio_only,
         result=result,
     )
-    if context.page_description and not result.get("error"):
-        result["error"] = context.page_description
-    warnings = list(result.get("warnings") or [])
-    _record_fallback_prepare_warnings(result, context)
-    result["fallback_context"] = _build_fallback_context(context)
-    result["fallback_status"] = "prepared"
+    _record_retry_context_state(result, context)
 
     artifacts = _execute_ydl_download(preparation)
     _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
