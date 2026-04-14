@@ -53,6 +53,7 @@ pip install -e .[dev]
 - whether the Selenium extra is fully available
 - the current effective `download.selenium` mode, such as `auto`, `on`, or `off`
 - the current effective `download.cookies_from_browser` and `download.cookie_file` values
+- a compact effective download config summary line so the final `selenium` and cookies combination is visible at a glance
 - whether cookies are configured via browser extraction or file path
 - combination risks or conflicts between `download.selenium`, `cookies_from_browser`, and `cookie_file`
 - focused remediation hints for common Windows issues such as locked cookie databases, missing drivers, and missing FFmpeg

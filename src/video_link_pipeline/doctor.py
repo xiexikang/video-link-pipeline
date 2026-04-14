@@ -273,6 +273,17 @@ def _check_effective_download_config(config: dict[str, Any]) -> list[DoctorCheck
 
     return [
         DoctorCheck(
+            name="download_effective_summary",
+            ok=True,
+            detail=(
+                "effective download config summary: "
+                f"selenium={selenium_mode} "
+                f"cookies_from_browser={effective_browser} "
+                f"cookie_file={effective_cookie_file}"
+            ),
+            section="effective_download_config",
+        ),
+        DoctorCheck(
             name="download_selenium",
             ok=True,
             detail=f"effective download.selenium={selenium_mode}",
