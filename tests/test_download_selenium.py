@@ -15,7 +15,9 @@ from video_link_pipeline.download.service import (
     _build_fallback_context,
     _build_retry_headers,
     _execute_primary_download,
+    _handle_fallback_vlp_error,
     _prepare_retry_download,
+    _record_primary_failure,
     _record_retry_context_state,
     _fallback_exception_warning_code,
     _classify_hint_warning,
@@ -107,6 +109,16 @@ def test_record_primary_download_warning_sets_warning_details_and_hint() -> None
     assert result["warning_details"][0]["stage"] == "primary_download"
     assert "triggered selenium fallback" in result["warning_details"][0]["message"]
     assert "Try browser cookies" in str(result["hint"])
+
+
+def test_record_primary_failure_sets_primary_download_error_state() -> None:
+    result = new_download_result("https://example.com/video")
+
+    _record_primary_failure(result, "primary extractor failed")
+
+    assert result["error"] == "primary extractor failed"
+    assert result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
+    assert result["error_stage"] == "primary_download"
 
 
 def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) -> None:
@@ -303,6 +315,24 @@ def test_record_retry_context_state_updates_description_context_and_status(tmp_p
         "extraction_source": "jsonld:contentUrl",
     }
     assert result["warning_details"][0]["code"] == "fallback_context_prepared"
+
+
+def test_handle_fallback_vlp_error_records_dependency_failure_and_hint() -> None:
+    result = new_download_result("https://example.com/video")
+
+    _handle_fallback_vlp_error(
+        result,
+        DependencyMissingError(
+            "selenium fallback requested but optional dependencies are not installed",
+            hint="install with: pip install 'video-link-pipeline[selenium]'",
+        ),
+    )
+
+    assert result["error_code"] == "DEPENDENCY_MISSING"
+    assert result["error_stage"] == "fallback_dependency"
+    assert result["fallback_status"] == "dependency_missing"
+    assert result["warning_details"][0]["code"] == "fallback_dependency_hint"
+    assert "Install the Selenium extra" in str(result["hint"])
 
 
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
