@@ -8,7 +8,16 @@ from video_link_pipeline.download.selenium_fallback import (
     extract_page_signals_from_html,
     should_attempt_selenium_fallback,
 )
-from video_link_pipeline.download.service import _origin_from_url, _retry_with_selenium_context, execute_download
+from video_link_pipeline.download.service import (
+    _append_hint_warning,
+    _classify_hint_warning,
+    _classify_primary_warning,
+    _origin_from_url,
+    _record_primary_download_warning,
+    _retry_with_selenium_context,
+    _set_failure_state,
+    execute_download,
+)
 
 
 def test_should_attempt_selenium_fallback_auto_only_for_anti_crawl_errors() -> None:
@@ -16,6 +25,95 @@ def test_should_attempt_selenium_fallback_auto_only_for_anti_crawl_errors() -> N
     assert should_attempt_selenium_fallback("auto", "network timeout") is False
     assert should_attempt_selenium_fallback("off", "403 forbidden") is False
     assert should_attempt_selenium_fallback("on", "anything") is True
+
+
+def test_classify_primary_warning_covers_common_cases() -> None:
+    assert _classify_primary_warning("HTTP Error 403: Forbidden") == "primary_http_403"
+    assert _classify_primary_warning("please verify you are human before continuing") == "primary_captcha_required"
+    assert _classify_primary_warning("could not copy database because cookies are locked") == "browser_cookie_locked"
+    assert _classify_primary_warning("sign in to confirm your age") == "primary_auth_required"
+    assert _classify_primary_warning("unexpected extractor failure") == "primary_download_failed"
+
+
+def test_classify_hint_warning_covers_shared_dependency_cases() -> None:
+    assert _classify_hint_warning("could not copy database because the database is locked", default_code="fallback_retry_hint") == "browser_cookie_locked"
+    assert _classify_hint_warning("chromedriver could not be found", default_code="fallback_retry_hint") == "browser_driver_unavailable"
+    assert _classify_hint_warning("ffmpeg is required for merge", default_code="fallback_retry_hint") == "ffmpeg_unavailable"
+    assert _classify_hint_warning("some custom retry hint", default_code="fallback_retry_hint") == "fallback_retry_hint"
+
+
+def test_set_failure_state_updates_result_consistently() -> None:
+    result = {
+        "error": None,
+        "error_code": None,
+        "error_stage": None,
+        "fallback_status": "triggered",
+    }
+
+    _set_failure_state(
+        result,
+        error="final retry failed",
+        error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
+        error_stage="fallback_retry",
+        fallback_status="retry_failed",
+    )
+
+    assert result["error"] == "final retry failed"
+    assert result["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert result["error_stage"] == "fallback_retry"
+    assert result["fallback_status"] == "retry_failed"
+
+
+def test_record_primary_download_warning_sets_warning_details_and_hint() -> None:
+    result = {"warnings": [], "warning_details": [], "hint": None}
+
+    warning_code = _record_primary_download_warning(result, "HTTP Error 403: Forbidden")
+
+    assert warning_code == "primary_http_403"
+    assert result["warning_details"][0]["code"] == "primary_http_403"
+    assert result["warning_details"][0]["stage"] == "primary_download"
+    assert "triggered selenium fallback" in result["warning_details"][0]["message"]
+    assert "Try browser cookies" in str(result["hint"])
+
+
+def test_append_hint_warning_does_not_override_existing_hint_by_default() -> None:
+    result = {
+        "warnings": [],
+        "warning_details": [],
+        "hint": "existing primary hint",
+    }
+
+    warning_code = _append_hint_warning(
+        result,
+        hint="ffmpeg is required for merge",
+        default_code="fallback_retry_hint",
+        stage="fallback_retry",
+    )
+
+    assert warning_code == "ffmpeg_unavailable"
+    assert result["warning_details"][0]["code"] == "ffmpeg_unavailable"
+    assert result["warning_details"][0]["stage"] == "fallback_retry"
+    assert result["hint"] == "existing primary hint"
+
+
+def test_append_hint_warning_can_override_hint_when_requested() -> None:
+    result = {
+        "warnings": [],
+        "warning_details": [],
+        "hint": "existing primary hint",
+    }
+
+    warning_code = _append_hint_warning(
+        result,
+        hint="chromedriver is missing",
+        default_code="fallback_retry_hint",
+        stage="fallback_prepare",
+        overwrite_hint=True,
+    )
+
+    assert warning_code == "browser_driver_unavailable"
+    assert result["warning_details"][0]["code"] == "browser_driver_unavailable"
+    assert "Install the Selenium extra" in str(result["hint"])
 
 
 def test_execute_download_returns_install_hint_when_selenium_extra_missing(monkeypatch, tmp_path: Path) -> None:
