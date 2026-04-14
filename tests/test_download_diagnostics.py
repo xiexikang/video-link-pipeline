@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from video_link_pipeline.download.diagnostics import (
     preferred_warning_hint,
+    warning_catalog,
+    warning_catalog_codes,
     warning_code_description,
     warning_code_remediation,
 )
@@ -21,6 +23,23 @@ def test_warning_code_description_and_remediation_for_known_code() -> None:
 def test_warning_code_lookup_returns_none_for_unknown_code() -> None:
     assert warning_code_description("unknown-warning-code") is None
     assert warning_code_remediation("unknown-warning-code") is None
+
+
+def test_warning_catalog_exposes_sorted_shared_index() -> None:
+    catalog = warning_catalog()
+    codes = [entry.code for entry in catalog]
+
+    assert codes == sorted(codes)
+    assert "browser_cookie_locked" in codes
+    assert "ffmpeg_unavailable" in codes
+    cookie_entry = next(entry for entry in catalog if entry.code == "browser_cookie_locked")
+    assert "cookies database" in cookie_entry.description
+    assert cookie_entry.remediation is not None
+    assert "Close the target browser completely" in cookie_entry.remediation
+
+
+def test_warning_catalog_codes_matches_catalog_entries() -> None:
+    assert warning_catalog_codes() == [entry.code for entry in warning_catalog()]
 
 
 def test_preferred_warning_hint_prefers_shared_remediation() -> None:

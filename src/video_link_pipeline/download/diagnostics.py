@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 WARNING_CODES = {
     "primary_download_failed": "Primary download failed without a more specific classification.",
     "primary_http_403": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction.",
@@ -43,12 +45,36 @@ WARNING_REMEDIATIONS = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class WarningCatalogEntry:
+    code: str
+    description: str
+    remediation: str | None = None
+
+
 def warning_code_description(code: str) -> str | None:
     return WARNING_CODES.get(code)
 
 
 def warning_code_remediation(code: str) -> str | None:
     return WARNING_REMEDIATIONS.get(code)
+
+
+def warning_catalog() -> list[WarningCatalogEntry]:
+    entries: list[WarningCatalogEntry] = []
+    for code in sorted(WARNING_CODES):
+        entries.append(
+            WarningCatalogEntry(
+                code=code,
+                description=WARNING_CODES[code],
+                remediation=WARNING_REMEDIATIONS.get(code),
+            )
+        )
+    return entries
+
+
+def warning_catalog_codes() -> list[str]:
+    return [entry.code for entry in warning_catalog()]
 
 
 def preferred_warning_hint(code: str, fallback_hint: str | None = None) -> str | None:

@@ -440,6 +440,7 @@ Representative warning codes include:
 - Detects likely anti-crawling failures
 - Optionally invokes Selenium fallback
 - Emits structured download diagnostics for manifest and CLI output
+- Maintains the shared warning-code catalog used by download results, doctor guidance, and documentation
 
 ### `video_link_pipeline.transcribe`
 
