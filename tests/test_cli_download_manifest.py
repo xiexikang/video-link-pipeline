@@ -141,12 +141,15 @@ def test_download_cli_prints_fallback_diagnostics(monkeypatch, tmp_path: Path) -
 
     assert result.exit_code == 0, result.stdout
     assert "download used selenium fallback" in result.stdout
-    assert "fallback status=triggered" in result.stdout
+    assert "download fallback_status=triggered" in result.stdout
     assert "download error_code=DOWNLOAD_PRIMARY_FAILED" in result.stdout
+    assert "download error_stage=primary_download" in result.stdout
     assert "download hint=Try browser cookies, wait before retrying, or switch to Selenium fallback if the site is anti-bot protected." in result.stdout
-    assert "download warning[primary_http_403] stage=primary_download" in result.stdout
-    assert "fallback extraction_source=jsonld:contentUrl" in result.stdout
-    assert "fallback media_hint_url=https://cdn.example.com/media.m3u8" in result.stdout
+    assert "download warning_code=primary_http_403 stage=primary_download" in result.stdout
+    assert "download fallback_context.extraction_source=jsonld:contentUrl" in result.stdout
+    assert "download fallback_context.media_hint_url=https://cdn.example.com/media.m3u8" in result.stdout
+    assert "download fallback_context.canonical_url=https://example.com/watch/demo" in result.stdout
+    assert "download fallback_context.resolved_url=https://example.com/resolved" in result.stdout
 
 
 def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path: Path) -> None:
@@ -192,9 +195,10 @@ def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path:
 
     assert result.exit_code != 0
     assert "download error_code=DOWNLOAD_FALLBACK_RETRY_FAILED" in result.stdout
-    assert "fallback status=retry_failed" in result.stdout
+    assert "download fallback_status=retry_failed" in result.stdout
+    assert "download error_stage=fallback_retry" in result.stdout
     assert "download hint=Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally." in result.stdout
-    assert "download warning[fallback_retry_hint] stage=fallback_retry" in result.stdout
+    assert "download warning_code=fallback_retry_hint stage=fallback_retry" in result.stdout
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
     assert getattr(result.exception, "hint", None) == "Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally."

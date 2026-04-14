@@ -313,6 +313,18 @@ If fallback successfully prepares a browser context, the common signals become:
 - `warning_details.code` contains `fallback_context_prepared`
 - `fallback_context.media_hint_url` and `fallback_context.extraction_source` can be used to analyze extractor quality per site
 
+The CLI download diagnostics now mirrors the same field names where practical so console output lines up with `manifest.json` and `vlp doctor` terminology:
+
+- `download fallback_status=...`
+- `download error_code=...`
+- `download error_stage=...`
+- `download hint=...`
+- `download warning_code=<code> stage=<stage>: ...`
+- `download fallback_context.extraction_source=...`
+- `download fallback_context.media_hint_url=...`
+- `download fallback_context.canonical_url=...`
+- `download fallback_context.resolved_url=...`
+
 These `warning_details.code` values and `vlp doctor` guidance are backed by the same shared diagnostics catalog in `video_link_pipeline.download.diagnostics`. New warning codes should be added there first so doctor, manifest output, and docs stay aligned.
 
 ## Compatibility Wrappers

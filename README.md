@@ -313,6 +313,18 @@ output/
 - `warning_details.code` 里出现 `fallback_context_prepared`
 - `fallback_context.media_hint_url`、`fallback_context.extraction_source` 可用于后续分析站点提取质量
 
+CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `manifest.json`、`vlp doctor` 对照：
+
+- `download fallback_status=...`
+- `download error_code=...`
+- `download error_stage=...`
+- `download hint=...`
+- `download warning_code=<code> stage=<stage>: ...`
+- `download fallback_context.extraction_source=...`
+- `download fallback_context.media_hint_url=...`
+- `download fallback_context.canonical_url=...`
+- `download fallback_context.resolved_url=...`
+
 这些 `warning_details.code` 与 `vlp doctor` 使用的是同一份共享诊断索引，当前统一维护在 `video_link_pipeline.download.diagnostics` 中，后续新增诊断码也应优先补这里，再同步消费方。
 
 ## 兼容脚本

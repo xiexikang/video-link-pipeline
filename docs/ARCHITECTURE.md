@@ -409,6 +409,7 @@ Representative warning codes include:
 - Parses arguments
 - Resolves config overrides
 - Maps domain errors to exit codes
+- Renders download diagnostics with field names aligned to the manifest contract where practical, such as `download fallback_status`, `download error_code`, `download error_stage`, and `download warning_code`
 
 ### `video_link_pipeline.config`
 
@@ -605,6 +606,7 @@ Include:
 - Where outputs are being written
 - What fallback was used
 - How to recover when a known failure happens
+- Diagnostic field names that stay reasonably aligned with the manifest contract, so console output and machine-readable output are easier to correlate
 
 ## Testing Strategy
 
