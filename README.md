@@ -48,7 +48,7 @@ pip install -e .[dev]
 
 `vlp doctor` 当前会重点展示：
 
-- 分段的检查输出，例如 `runtime`、`download prerequisites`、`common diagnostic guidance`
+- 分段的检查输出，例如 `runtime`、`download prerequisites`、`effective download config`、`config risks`、`common diagnostic guidance`
 - FFmpeg 的最终选择来源和路径，例如系统 `ffmpeg` 或 `imageio-ffmpeg`
 - Selenium extra 是否完整可用
 - 当前有效的 `download.selenium` 模式，例如 `auto`、`on`、`off`
