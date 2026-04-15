@@ -401,6 +401,27 @@ Representative warning codes include:
 - `fallback_prepare_hint`
 - `fallback_retry_hint`
 
+The same diagnostic code should remain reusable across three presentation layers:
+
+- download manifest fields such as `execution.download.warning_details[].code`
+- CLI diagnostic lines such as `download warning_code=<code> stage=<stage>: ...`
+- doctor guidance/reference output derived from the shared diagnostics catalog
+
+Recommended interpretation split:
+
+- manifest `warning_details.code` is the stable machine-oriented key
+- manifest `hint` is the best user-facing remediation for the current failure path
+- CLI renders near-manifest field names for easier correlation during debugging
+- doctor renders the same code catalog as environment/config guidance, but should separate currently active codes from passive reference codes
+
+This allows new diagnostic codes to be added once in `video_link_pipeline.download.diagnostics` and then consumed consistently by:
+
+- runtime download execution
+- manifest serialization
+- CLI rendering
+- doctor guidance
+- README and architecture documentation
+
 ### Download Execution Phases
 
 The internal download flow should remain split into a small number of explicit phases so that

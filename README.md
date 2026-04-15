@@ -360,6 +360,30 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 
 这些 `warning_details.code` 与 `vlp doctor` 使用的是同一份共享诊断索引，当前统一维护在 `video_link_pipeline.download.diagnostics` 中，后续新增诊断码也应优先补这里，再同步消费方。
 
+可以把它们理解成一套共享诊断语言，不同出口的职责如下：
+
+- `manifest.json > execution.download.warning_details.code`：稳定的机器可读分类键，适合统计、批处理、告警聚合
+- `manifest.json > execution.download.hint`：当前失败路径下最应该优先展示给用户的修复建议
+- CLI `download warning_code=<code> stage=<stage>: ...`：面向终端排查时的即时输出，字段名尽量贴近 manifest
+- `vlp doctor` 的 `common diagnostic guidance`：针对“当前环境/配置已命中的诊断码”给出说明与 fix
+- `vlp doctor` 的 `known diagnostic codes`：补充常见但当前未命中的共享诊断码，作为参考索引
+
+常见诊断码对照建议如下：
+
+| 诊断码 | 典型出现位置 | 含义 | 建议动作 |
+| --- | --- | --- | --- |
+| `primary_http_403` | download manifest / download CLI / doctor 参考 | 主下载遇到 403，通常是反爬、鉴权或区域限制 | 先尝试 `--cookies-from-browser`，必要时打开 `--selenium auto/on` |
+| `primary_captcha_required` | download manifest / download CLI / doctor 参考 | 页面要求验证码或人机校验 | 先在浏览器里完成验证，再重试 cookies 或 fallback |
+| `primary_auth_required` | doctor 当前检查 / download manifest / doctor 参考 | 站点需要登录或账号权限 | 登录后使用浏览器 cookies 或 `cookies.txt` |
+| `browser_cookie_locked` | doctor 当前检查 / download manifest / doctor 参考 | 浏览器 cookies 库被占用、锁定或无法复制 | 完全关闭浏览器后重试，Windows 上尤其常见 |
+| `browser_driver_unavailable` | doctor 当前检查 / download manifest / doctor 参考 | Selenium extra 或浏览器驱动不可用 | 安装 `video-link-pipeline[selenium]`，确认 Chrome 可正常启动 |
+| `ffmpeg_unavailable` | doctor 当前检查 / doctor 参考 | FFmpeg 缺失，可能影响合并、转码、抽音频 | 安装系统 ffmpeg，或保留 `imageio-ffmpeg` |
+| `fallback_context_prepared` | download manifest / download CLI | 浏览器上下文已成功准备，可进入重试 | 重点查看 `fallback_context.*` 字段判断提取质量 |
+| `fallback_media_hint_missing` | download manifest / download CLI / doctor 参考 | 没有抽到明确媒体地址，只能退回页面地址重试 | 后续优先补站点线索提取；当前可先看 `resolved_url`/`canonical_url` |
+| `fallback_dependency_hint` | download manifest / download CLI | fallback 依赖缺失时的补充提示 | 按 hint 安装依赖 |
+| `fallback_prepare_hint` | download manifest / download CLI | fallback 准备阶段失败时的补充提示 | 看浏览器启动、cookies 导出、页面线索提取链路 |
+| `fallback_retry_hint` | download manifest / download CLI | fallback 重试阶段失败时的补充提示 | 看 headers/cookies/media hint 是否正确 |
+
 当前下载实现内部也已经按阶段收口为三段，便于长期维护：
 
 - `primary path`：常规 `yt-dlp` 下载与产物标准化
