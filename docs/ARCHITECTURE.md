@@ -499,6 +499,16 @@ Phase boundaries should stay visible in code through small helpers so the follow
 - Provides actionable remediation guidance
 - Uses `WARN` for blocking conflicts and `INFO` for non-blocking but noteworthy config-risk items
 
+Doctor output contract for v1 should stay stable enough for both humans and lightweight log parsing:
+
+- `runtime`, `download prerequisites`, `effective download config`, and `config risks` should be rendered as explicit section headers
+- successful checks in normal sections should render as `OK`
+- failed checks should render as `WARN`
+- successful checks in `config risks` should render as `INFO` rather than `OK`, because they represent advisory risk notes instead of passed health checks
+- `common diagnostic guidance` should render only active diagnostic codes gathered from the current checks
+- `known diagnostic codes` should render only the remaining built-in reference codes that were not already emitted in `common diagnostic guidance`
+- duplicate diagnostic codes should be deduplicated in rendered guidance/reference output even if multiple checks carry the same code
+
 ## Dependency Strategy
 
 ### Core Dependencies
