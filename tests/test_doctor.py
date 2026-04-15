@@ -180,6 +180,152 @@ def test_doctor_command_prints_diagnostic_guidance(monkeypatch, tmp_path: Path) 
     assert "browser_cookie_locked" in result.stdout
 
 
+def test_doctor_command_prints_known_codes_without_guidance(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "output_dir": str(tmp_path / "output"),
+                "summary": {"provider": "claude"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.cli.run_checks",
+        lambda _: [
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="python",
+                ok=True,
+                detail="Python 3.11.0",
+                section="runtime",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="cookies",
+                ok=True,
+                detail="cookie source omitted intentionally",
+                section="download_prerequisites",
+            ),
+        ],
+    )
+
+    result = runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert "common diagnostic guidance:" not in result.stdout
+    assert "known diagnostic codes:" in result.stdout
+    assert "primary_auth_required" in result.stdout
+    assert "ffmpeg_unavailable" in result.stdout
+
+
+def test_doctor_command_renders_section_status_levels(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "output_dir": str(tmp_path / "output"),
+                "summary": {"provider": "claude"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.cli.run_checks",
+        lambda _: [
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="python",
+                ok=True,
+                detail="Python 3.11.0",
+                section="runtime",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="ffmpeg",
+                ok=False,
+                detail="ffmpeg missing",
+                section="download_prerequisites",
+                code="ffmpeg_unavailable",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_effective_summary",
+                ok=True,
+                detail="effective download config summary: selenium=auto cookies_from_browser=none cookie_file=none",
+                section="effective_download_config",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="download_config",
+                ok=True,
+                detail="download selenium=off and no cookie source is configured",
+                section="config_risks",
+                code="primary_auth_required",
+            ),
+        ],
+    )
+
+    result = runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert "runtime:" in result.stdout
+    assert "download prerequisites:" in result.stdout
+    assert "effective download config:" in result.stdout
+    assert "config risks:" in result.stdout
+    assert "[OK] python: Python 3.11.0" in result.stdout
+    assert "[WARN] ffmpeg: ffmpeg missing" in result.stdout
+    assert (
+        "[OK] download_effective_summary: effective download config summary: "
+        "selenium=auto cookies_from_browser=none cookie_file=none"
+    ) in result.stdout
+    assert "[INFO] download_config: download selenium=off and no cookie source is configured" in result.stdout
+    assert "doctor found items that may block some workflows" in result.stdout
+
+
+def test_doctor_command_deduplicates_guidance_and_reference_codes(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "output_dir": str(tmp_path / "output"),
+                "summary": {"provider": "claude"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.cli.run_checks",
+        lambda _: [
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="ffmpeg",
+                ok=False,
+                detail="ffmpeg missing",
+                section="download_prerequisites",
+                code="ffmpeg_unavailable",
+                hint="install ffmpeg",
+            ),
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="ffmpeg_retry",
+                ok=False,
+                detail="ffmpeg still missing",
+                section="config_risks",
+                code="ffmpeg_unavailable",
+                hint="install ffmpeg",
+            ),
+        ],
+    )
+
+    result = runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert result.stdout.count("ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail.") == 1
+    assert result.stdout.count("ffmpeg_unavailable fix: install ffmpeg and ensure it is available in PATH") == 1
+    known_codes_section = result.stdout.split("known diagnostic codes:", 1)[1]
+    assert "ffmpeg_unavailable:" not in known_codes_section
+
+
 def test_doctor_reference_lines_include_common_codes_and_fixes() -> None:
     lines = doctor_reference_lines()
 
