@@ -360,6 +360,30 @@ The CLI download diagnostics now mirrors the same field names where practical so
 
 These `warning_details.code` values and `vlp doctor` guidance are backed by the same shared diagnostics catalog in `video_link_pipeline.download.diagnostics`. New warning codes should be added there first so doctor, manifest output, and docs stay aligned.
 
+You can think of these as one shared diagnostics language with different presentation layers:
+
+- `manifest.json > execution.download.warning_details.code`: stable machine-readable classification keys for aggregation and batch analysis
+- `manifest.json > execution.download.hint`: the single best remediation hint for the current failure path
+- CLI `download warning_code=<code> stage=<stage>: ...`: immediate terminal diagnostics using field names close to the manifest
+- `vlp doctor` `common diagnostic guidance`: explanations and fixes for diagnostic codes currently active in the environment/config checks
+- `vlp doctor` `known diagnostic codes`: a reference list of common shared codes that are not currently active
+
+Suggested crosswalk for common codes:
+
+| Diagnostic code | Typical surface | Meaning | Suggested action |
+| --- | --- | --- | --- |
+| `primary_http_403` | download manifest / download CLI / doctor reference | Primary download hit 403, usually anti-bot, auth, or geo restriction | Try `--cookies-from-browser` first, then enable `--selenium auto/on` if needed |
+| `primary_captcha_required` | download manifest / download CLI / doctor reference | The page requires captcha or human verification | Complete verification in a browser, then retry with cookies or fallback |
+| `primary_auth_required` | doctor active check / download manifest / doctor reference | The site requires login or account access | Log in and retry with browser cookies or a Netscape cookie file |
+| `browser_cookie_locked` | doctor active check / download manifest / doctor reference | Browser cookies storage is locked or could not be copied | Fully close the browser and retry, especially on Windows |
+| `browser_driver_unavailable` | doctor active check / download manifest / doctor reference | Selenium extra or browser driver is unavailable | Install `video-link-pipeline[selenium]` and verify Chrome can launch |
+| `ffmpeg_unavailable` | doctor active check / doctor reference | FFmpeg is missing and media merge/transcode may fail | Install system ffmpeg or keep `imageio-ffmpeg` available |
+| `fallback_context_prepared` | download manifest / download CLI | Browser context was prepared successfully and retry can proceed | Inspect `fallback_context.*` fields to evaluate extraction quality |
+| `fallback_media_hint_missing` | download manifest / download CLI / doctor reference | No explicit media URL was extracted, so retry falls back to the page URL | Improve site signal extraction later; for now inspect `resolved_url` and `canonical_url` |
+| `fallback_dependency_hint` | download manifest / download CLI | Extra hint emitted when fallback dependencies are missing | Follow the emitted install hint |
+| `fallback_prepare_hint` | download manifest / download CLI | Extra hint emitted when fallback preparation failed | Inspect browser launch, cookies export, and page-signal extraction |
+| `fallback_retry_hint` | download manifest / download CLI | Extra hint emitted when fallback retry failed | Inspect retry headers, cookies, and media hint quality |
+
 The current download implementation is also being kept in three maintainable internal phases:
 
 - `primary path`: normal `yt-dlp` download and artifact normalization
