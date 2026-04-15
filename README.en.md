@@ -423,6 +423,8 @@ The current download implementation is also being kept in three maintainable int
 The current `manifest.json` update behavior is also now locked by regression tests around a few important guarantees:
 
 - when `vlp download` fails but a job directory has already been resolved, the CLI still writes `manifest.json` before raising the final error
+- when `vlp transcribe` fails but the transcription job directory and `transcript.txt` path have already been resolved, the CLI still writes `manifest.json` before raising the final error
+- when `vlp summarize` fails but the summary job directory and `summary.md` path have already been resolved, the CLI still writes `manifest.json` before raising the final error
 - `execution.download.error_code` falls back to `DOWNLOAD_FAILED` when the download result is unsuccessful and does not provide a more specific code
 - when `vlp run` completes after download only, the final `manifest.json` preserves the full `execution.download` diagnostics and does not synthesize `transcribe` or `summarize`
 - when `vlp run` fails during transcription, the manifest preserves the successful download state and ends with the most recent command value `vlp transcribe`

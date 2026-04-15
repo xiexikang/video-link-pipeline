@@ -394,6 +394,7 @@ Example:
 - `execution.download.hint` should carry the best user-facing remediation available for the current failure path
 - Selenium retry diagnostics should be represented with `fallback_status` and `fallback_context` rather than requiring log scraping
 - If a command step fails after a job directory has been established, the latest step should still flush its manifest state before the CLI raises the terminal error
+- The same early-flush rule applies to single-step commands such as `vlp transcribe` and `vlp summarize` once their output path has been resolved
 - `vlp run` should preserve partial-success state instead of collapsing everything into a generic final status; the last successful or failed step remains visible through `command` and `execution.*`
 - If a failed download result omits a specific `error_code`, manifest serialization should normalize it to `DOWNLOAD_FAILED`
 
