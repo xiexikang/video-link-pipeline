@@ -124,8 +124,27 @@ def _set_result_hint(result: dict[str, object], hint: str | None, *, overwrite: 
         result["hint"] = normalized
 
 
-def _apply_warning_remediation(result: dict[str, object], code: str, *, overwrite: bool = False) -> None:
-    _set_result_hint(result, preferred_warning_hint(code), overwrite=overwrite)
+def _append_warning_with_hint(
+    result: dict[str, object],
+    *,
+    code: str,
+    message: str,
+    stage: str,
+    fallback_hint: str | None = None,
+    overwrite_hint: bool = False,
+) -> None:
+    """Append a warning and then promote the best matching hint in a stable order."""
+    _append_warning(
+        result,
+        code=code,
+        message=message,
+        stage=stage,
+    )
+    _set_result_hint(
+        result,
+        preferred_warning_hint(code, fallback_hint),
+        overwrite=overwrite_hint,
+    )
 
 
 def _set_failure_state(
@@ -154,16 +173,13 @@ def _append_hint_warning(
 ) -> str:
     """Append a warning derived from a hint string and optionally promote its remediation."""
     warning_code = _classify_hint_warning(hint, default_code=default_code)
-    _append_warning(
-        result,
+    _append_warning_with_hint(
+        result=result,
         code=warning_code,
         message=hint,
         stage=stage,
-    )
-    _set_result_hint(
-        result,
-        preferred_warning_hint(warning_code, hint),
-        overwrite=overwrite_hint,
+        fallback_hint=hint,
+        overwrite_hint=overwrite_hint,
     )
     return warning_code
 
@@ -236,13 +252,12 @@ def _record_primary_exception(result: dict[str, object], exc: Exception) -> None
 def _record_primary_download_warning(result: dict[str, object], error_message: str) -> str:
     """Record the primary-download failure warning and set its best hint."""
     warning_code = _classify_primary_warning(error_message)
-    _append_warning(
-        result,
+    _append_warning_with_hint(
+        result=result,
         code=warning_code,
         message=_primary_warning_message(error_message),
         stage="primary_download",
     )
-    _apply_warning_remediation(result, warning_code)
     return warning_code
 
 
