@@ -72,6 +72,10 @@ def test_classify_hint_warning_covers_shared_dependency_cases() -> None:
     assert _classify_hint_warning("some custom retry hint", default_code="fallback_retry_hint") == "fallback_retry_hint"
 
 
+def test_classify_hint_warning_recognizes_account_access_cases() -> None:
+    assert _classify_hint_warning("account access is required for this content", default_code="fallback_retry_hint") == "primary_auth_required"
+
+
 def test_fallback_exception_warning_code_maps_exception_types() -> None:
     assert _fallback_exception_warning_code(DependencyMissingError("missing", hint="install selenium")) == "fallback_dependency_hint"
     assert _fallback_exception_warning_code(__import__("video_link_pipeline.download.selenium_fallback", fromlist=["SeleniumFallbackError"]).SeleniumFallbackError("prepare failed")) == "fallback_prepare_hint"
@@ -335,6 +339,22 @@ def test_handle_fallback_vlp_error_records_dependency_failure_and_hint() -> None
     assert result["fallback_status"] == "dependency_missing"
     assert result["warning_details"][0]["code"] == "fallback_dependency_hint"
     assert "Install the Selenium extra" in str(result["hint"])
+
+
+def test_handle_fallback_vlp_error_uses_dependency_state_mapping() -> None:
+    result = new_download_result("https://example.com/video")
+
+    _handle_fallback_vlp_error(
+        result,
+        DependencyMissingError(
+            "selenium fallback requested but optional dependencies are not installed",
+            hint="missing webdriver",
+        ),
+    )
+
+    assert result["error_stage"] == "fallback_dependency"
+    assert result["fallback_status"] == "dependency_missing"
+    assert result["warning_details"][0]["stage"] == "fallback_dependency"
 
 
 def test_handle_fallback_vlp_error_records_prepare_failure_with_stage_hint() -> None:
