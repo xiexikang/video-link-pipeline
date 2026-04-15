@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from video_link_pipeline.download.diagnostics import (
+    cookie_file_export_hint,
     preferred_warning_hint,
+    selenium_extra_install_hint,
+    supported_browser_names,
+    supported_browsers_hint,
     warning_catalog,
     warning_catalog_codes,
     warning_code_description,
     warning_code_remediation,
+    warning_reference_lines,
 )
 from video_link_pipeline.doctor import DoctorCheck, doctor_guidance
 
@@ -59,6 +64,30 @@ def test_warning_catalog_codes_cover_all_declared_warning_codes() -> None:
     assert "primary_download_failed" in catalog_codes
     assert "fallback_retry_unhandled_exception" in catalog_codes
     assert "ffmpeg_unavailable" in catalog_codes
+
+
+def test_warning_reference_lines_render_description_and_optional_fix() -> None:
+    lines = warning_reference_lines(["browser_cookie_locked", "fallback_dependency_hint"])
+
+    assert lines[0].startswith("browser_cookie_locked:")
+    assert lines[1].startswith("browser_cookie_locked fix:")
+    assert lines[2] == "fallback_dependency_hint: Additional hint emitted when fallback dependencies are missing."
+
+
+def test_supported_browser_helpers_share_same_display_order() -> None:
+    names = supported_browser_names()
+
+    assert names == ("chrome", "edge", "firefox", "opera", "brave", "vivaldi", "safari")
+    assert supported_browsers_hint() == "supported browsers: chrome, edge, firefox, opera, brave, vivaldi, safari"
+
+
+def test_cookie_file_and_selenium_install_hints_are_stable() -> None:
+    assert cookie_file_export_hint(missing=True) == "export a Netscape-format cookies.txt file and point --cookie-file to it"
+    assert (
+        cookie_file_export_hint(missing=False)
+        == "make sure the file is in Netscape cookies.txt format if download authentication still fails"
+    )
+    assert selenium_extra_install_hint() == "install with: pip install 'video-link-pipeline[selenium]'"
 
 
 def test_preferred_warning_hint_prefers_shared_remediation() -> None:
