@@ -38,8 +38,27 @@ def test_warning_catalog_exposes_sorted_shared_index() -> None:
     assert "Close the target browser completely" in cookie_entry.remediation
 
 
+def test_warning_catalog_keeps_entries_without_remediation() -> None:
+    catalog = warning_catalog()
+
+    dependency_entry = next(entry for entry in catalog if entry.code == "fallback_dependency_hint")
+
+    assert dependency_entry.description == (
+        "Additional hint emitted when fallback dependencies are missing."
+    )
+    assert dependency_entry.remediation is None
+
+
 def test_warning_catalog_codes_matches_catalog_entries() -> None:
     assert warning_catalog_codes() == [entry.code for entry in warning_catalog()]
+
+
+def test_warning_catalog_codes_cover_all_declared_warning_codes() -> None:
+    catalog_codes = set(warning_catalog_codes())
+
+    assert "primary_download_failed" in catalog_codes
+    assert "fallback_retry_unhandled_exception" in catalog_codes
+    assert "ffmpeg_unavailable" in catalog_codes
 
 
 def test_preferred_warning_hint_prefers_shared_remediation() -> None:
@@ -53,6 +72,18 @@ def test_preferred_warning_hint_falls_back_to_custom_hint() -> None:
     hint = preferred_warning_hint("fallback_dependency_hint", "install selenium")
 
     assert hint == "install selenium"
+
+
+def test_preferred_warning_hint_strips_blank_fallback_hint() -> None:
+    hint = preferred_warning_hint("fallback_dependency_hint", "   ")
+
+    assert hint is None
+
+
+def test_preferred_warning_hint_returns_none_when_no_shared_or_fallback_hint() -> None:
+    hint = preferred_warning_hint("primary_download_failed", None)
+
+    assert hint is None
 
 
 def test_doctor_guidance_deduplicates_codes_and_skips_missing_metadata() -> None:
