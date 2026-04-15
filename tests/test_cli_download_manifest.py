@@ -203,3 +203,132 @@ def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path:
     assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
     assert getattr(result.exception, "hint", None) == "Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally."
     assert str(result.exception) == "final retry failed"
+
+
+def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "video-failed-demo"
+    job_dir.mkdir(parents=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"output_dir": str(output_root)}, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+    def fake_download(**_: object) -> dict[str, object]:
+        return {
+            "success": False,
+            "folder": "video-failed-demo",
+            "video": None,
+            "audio": None,
+            "subtitle": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": True,
+            "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+            "error_stage": "fallback_retry",
+            "fallback_status": "retry_failed",
+            "hint": "Install the Selenium extra and verify the browser driver can start normally.",
+            "warnings": [
+                "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                "selenium fallback prepared but yt-dlp retry still failed",
+            ],
+            "warning_details": [
+                {
+                    "code": "primary_http_403",
+                    "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                    "stage": "primary_download",
+                },
+                {
+                    "code": "fallback_retry_hint",
+                    "message": "selenium fallback prepared but yt-dlp retry still failed",
+                    "stage": "fallback_retry",
+                },
+            ],
+            "fallback_context": {
+                "resolved_url": "https://example.com/resolved",
+                "canonical_url": "https://example.com/watch/demo",
+                "media_hint_url": "https://cdn.example.com/media.m3u8",
+                "site_name": "example.com",
+                "extraction_source": "jsonld:contentUrl",
+            },
+            "error": "final retry failed",
+        }
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+
+    result = runner.invoke(app, ["download", "https://example.com/video", "--config", str(config_path)])
+
+    assert result.exit_code != 0
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    download_execution = manifest["execution"]["download"]
+    assert manifest["command"] == "vlp download"
+    assert manifest["input"]["url"] == "https://example.com/video"
+    assert manifest["artifacts"]["folder"] == "video-failed-demo"
+    assert download_execution["success"] is False
+    assert download_execution["used_selenium_fallback"] is True
+    assert download_execution["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert download_execution["error"] == "final retry failed"
+    assert download_execution["hint"] == "Install the Selenium extra and verify the browser driver can start normally."
+    assert download_execution["fallback_status"] == "retry_failed"
+    assert download_execution["warning_details"][0]["code"] == "primary_http_403"
+    assert download_execution["warning_details"][1]["code"] == "fallback_retry_hint"
+    assert download_execution["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
+    assert result.exception is not None
+    assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+
+
+def test_download_failure_manifest_defaults_error_code_when_missing(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "video-default-error-demo"
+    job_dir.mkdir(parents=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"output_dir": str(output_root)}, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+    def fake_download(**_: object) -> dict[str, object]:
+        return {
+            "success": False,
+            "folder": "video-default-error-demo",
+            "video": None,
+            "audio": None,
+            "subtitle": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": False,
+            "error_code": None,
+            "error_stage": "primary_download",
+            "fallback_status": "not_attempted",
+            "hint": None,
+            "warnings": ["primary download failed without a more specific classification"],
+            "warning_details": [
+                {
+                    "code": "primary_download_failed",
+                    "message": "primary download failed without a more specific classification",
+                    "stage": "primary_download",
+                }
+            ],
+            "fallback_context": None,
+            "error": "download failed",
+        }
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+
+    result = runner.invoke(app, ["download", "https://example.com/video", "--config", str(config_path)])
+
+    assert result.exit_code != 0
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    download_execution = manifest["execution"]["download"]
+    assert download_execution["success"] is False
+    assert download_execution["used_selenium_fallback"] is False
+    assert download_execution["error_code"] == "DOWNLOAD_FAILED"
+    assert download_execution["fallback_status"] == "not_attempted"
+    assert download_execution["warning_details"][0]["code"] == "primary_download_failed"
+    assert result.exception is not None
+    assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FAILED"
