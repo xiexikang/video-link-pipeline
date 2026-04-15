@@ -112,7 +112,53 @@ If you are contributing locally, install the dev extra:
 pip install -e .[dev]
 ```
 
-The minimum validation commands aligned with CI are:
+Recommended local validation order:
+
+1. Confirm that the active Python interpreter is the environment you expect
+
+```bash
+python -c "import sys; print(sys.executable)"
+```
+
+2. Run a lightweight sanity pass first so basic import, syntax, and build issues fail fast
+
+```bash
+python -m pip check
+python -m compileall src tests
+python -m build
+```
+
+3. Then run linting and tests
+
+```bash
+python -m ruff check .
+python -m pytest
+```
+
+The current minimum validation matrix aligned with CI and the local script is:
+
+| Check | Recommended command | Purpose | Requires `.[dev]` |
+| --- | --- | --- | --- |
+| Dependency consistency | `python -m pip check` | Detect dependency conflicts in the active environment | No |
+| Syntax / importability | `python -m compileall src tests` | Catch syntax errors and obvious import issues early | No |
+| Linting | `python -m ruff check .` | Catch style issues and some low-cost correctness problems | Yes |
+| Unit tests | `python -m pytest` | Run the current regression suite | Yes |
+| Build validation | `python -m build` | Verify that sdist / wheel artifacts still build correctly | Yes |
+| PowerShell helper | `./scripts/check.ps1` | Run the repository's default local validation sequence | Depends on whether `ruff` / `pytest` / `build` are skipped |
+
+If you only want the fastest sanity check first, run:
+
+```bash
+python -m compileall src tests
+```
+
+Or on Windows / PowerShell:
+
+```powershell
+./scripts/check.ps1 -SkipPipCheck -SkipRuff -SkipPytest -SkipBuild
+```
+
+If you want to match the current CI more closely, run:
 
 ```bash
 python -m pip check
@@ -133,6 +179,7 @@ If you want to skip heavier steps:
 ```powershell
 ./scripts/check.ps1 -SkipPytest
 ./scripts/check.ps1 -SkipBuild
+./scripts/check.ps1 -SkipPipCheck -SkipCompileAll -SkipRuff -SkipPytest -SkipBuild
 ```
 
 If `pytest` is not installed yet, `python -m pytest` will fail with an error similar to `No module named pytest`. In that case, run:
@@ -161,6 +208,7 @@ Common local troubleshooting tips:
 - If `python -m pip check` reports dependency conflicts, first confirm you are using the intended virtual environment, then reinstall with `python -m pip install -e .[dev]`
 - On Windows, if you switch between multiple Python versions, `python -c "import sys; print(sys.executable)"` is a quick way to verify which interpreter is actually running these commands
 - `scripts/check.ps1` also prints the active `sys.executable` at startup so the script is easier to debug in multi-Python environments
+- If you only want to verify that recent documentation or test edits did not introduce syntax issues, `python -m compileall src tests` is the lowest-cost check available right now
 
 ## Configuration
 
