@@ -115,8 +115,11 @@ pip install -e .[dev]
 与当前 CI 保持一致的最小验证命令：
 
 ```bash
+python -m pip check
+python -m compileall src tests
 python -m ruff check .
 python -m pytest
+python -m build
 ```
 
 如果当前环境还没安装 `pytest`，运行 `python -m pytest` 时会看到类似 `No module named pytest` 的报错。这时重新执行：
@@ -131,6 +134,11 @@ pip install -e .[dev]
 python -m pytest tests/test_doctor.py
 python -m pytest tests/test_download_diagnostics.py
 ```
+
+当前 CI 额外还会做两类轻量校验：
+
+- `python -m pip check`：检查安装后的依赖约束是否冲突
+- `python -m build`：验证当前仓库仍然可以正常构建 sdist / wheel
 
 ## 配置
 

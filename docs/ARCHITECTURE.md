@@ -563,6 +563,7 @@ Recommended contents:
 
 Dev extra may include:
 
+- `build`
 - `pytest`
 - `ruff`
 - `mypy`
@@ -702,8 +703,11 @@ Minimum GitHub Actions coverage:
 Recommended command alignment:
 
 - Install dependencies with `python -m pip install -e .[dev]`
+- Run dependency validation with `python -m pip check`
+- Run syntax smoke checks with `python -m compileall src tests`
 - Run lint with `python -m ruff check .`
 - Run tests with `python -m pytest`
+- Run packaging smoke checks with `python -m build`
 
 Recommended follow-up:
 
