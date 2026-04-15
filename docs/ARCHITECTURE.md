@@ -715,6 +715,12 @@ Local troubleshooting guidance should stay aligned with these commands:
 - `pip check` failures should be documented as environment consistency problems before they are treated as project-code regressions
 - Windows-specific docs should encourage checking `sys.executable` when users may have multiple Python interpreters installed
 
+For Windows-first developer experience, the repo may also provide a small PowerShell helper such as `scripts/check.ps1` that:
+
+- runs the same validation sequence as CI in a predictable order
+- prints the active Python executable before running checks
+- allows heavier steps such as `pytest` or `build` to be skipped explicitly during local iteration
+
 Recommended follow-up:
 
 - Add Ubuntu for early regression detection in pure Python paths
