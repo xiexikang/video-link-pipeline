@@ -115,8 +115,11 @@ pip install -e .[dev]
 The minimum validation commands aligned with CI are:
 
 ```bash
+python -m pip check
+python -m compileall src tests
 python -m ruff check .
 python -m pytest
+python -m build
 ```
 
 If `pytest` is not installed yet, `python -m pytest` will fail with an error similar to `No module named pytest`. In that case, run:
@@ -131,6 +134,11 @@ To run only a smaller subset first:
 python -m pytest tests/test_doctor.py
 python -m pytest tests/test_download_diagnostics.py
 ```
+
+CI now also runs two extra lightweight checks:
+
+- `python -m pip check`: verifies that installed dependency requirements are not in conflict
+- `python -m build`: verifies that the repository can still build both sdist and wheel artifacts
 
 ## Configuration
 

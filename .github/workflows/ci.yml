@@ -26,8 +26,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .[dev]
 
+      - name: Pip check
+        run: python -m pip check
+
+      - name: Compileall
+        run: python -m compileall src tests
+
       - name: Ruff
         run: python -m ruff check .
 
       - name: Pytest
         run: python -m pytest
+
+      - name: Build package
+        run: python -m build
