@@ -50,3 +50,48 @@ def test_write_manifest_is_atomic_and_replaces_existing_file(tmp_path: Path) -> 
     assert payload["artifacts"]["report"] == "doctor.txt"
     assert "stale" not in payload
     assert list(tmp_path.glob(".manifest.*.tmp")) == []
+
+
+def test_upsert_manifest_preserves_nested_download_execution_fields_on_finalize(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "job" / "manifest.json"
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp download",
+        input_data={"url": "https://example.com/video", "input_path": None},
+        artifacts={"folder": "job", "video": "job/video.mp4"},
+        execution={
+            "download": {
+                "success": True,
+                "used_selenium_fallback": True,
+                "fallback_status": "succeeded",
+                "fallback_context": {
+                    "media_hint_url": "https://cdn.example.com/media.m3u8",
+                    "extraction_source": "jsonld:contentUrl",
+                },
+                "warning_details": [
+                    {
+                        "code": "primary_http_403",
+                        "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                        "stage": "primary_download",
+                    }
+                ],
+            }
+        },
+    )
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp run",
+        config_effective={"output_dir": "./output"},
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["command"] == "vlp run"
+    assert payload["config_effective"]["output_dir"] == "./output"
+    assert payload["artifacts"]["video"] == "job/video.mp4"
+    assert payload["execution"]["download"]["success"] is True
+    assert payload["execution"]["download"]["used_selenium_fallback"] is True
+    assert payload["execution"]["download"]["fallback_status"] == "succeeded"
+    assert payload["execution"]["download"]["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
+    assert payload["execution"]["download"]["warning_details"][0]["code"] == "primary_http_403"
