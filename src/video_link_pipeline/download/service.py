@@ -40,6 +40,17 @@ class DownloadPreparation:
     ydl_options: dict[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class FallbackFailureState:
+    """Normalized failure-state mapping for fallback-stage exceptions."""
+
+    error_code: str
+    error_stage: str
+    fallback_status: str
+    warning_code: str
+    preferred_hint_code: str | None = None
+
+
 class DownloadError(VlpError):
     """Raised when the primary download path fails."""
 
@@ -157,6 +168,53 @@ def _append_hint_warning(
     return warning_code
 
 
+def _primary_warning_message(error_message: str) -> str:
+    return f"primary download failed and triggered selenium fallback: {error_message}"
+
+
+def _classify_warning_message(message: str, *, default_code: str) -> str:
+    lowered = message.lower()
+    if "403" in lowered or "forbidden" in lowered:
+        return "primary_http_403"
+    if "captcha" in lowered or "verify you are human" in lowered or "verification" in lowered:
+        return "primary_captcha_required"
+    if "cookie" in lowered and ("database" in lowered or "locked" in lowered or "copy" in lowered):
+        return "browser_cookie_locked"
+    if "could not copy database" in lowered or "database is locked" in lowered or "locked" in lowered:
+        return "browser_cookie_locked"
+    if "sign in" in lowered or "login required" in lowered or "account access" in lowered:
+        return "primary_auth_required"
+    if "chromedriver" in lowered or "webdriver" in lowered:
+        return "browser_driver_unavailable"
+    if "ffmpeg" in lowered:
+        return "ffmpeg_unavailable"
+    return default_code
+
+
+def _fallback_failure_state(exc: VlpError) -> FallbackFailureState:
+    if isinstance(exc, DependencyMissingError):
+        return FallbackFailureState(
+            error_code="DEPENDENCY_MISSING",
+            error_stage="fallback_dependency",
+            fallback_status="dependency_missing",
+            warning_code="fallback_dependency_hint",
+            preferred_hint_code="browser_driver_unavailable",
+        )
+    if isinstance(exc, SeleniumFallbackError):
+        return FallbackFailureState(
+            error_code="DOWNLOAD_FALLBACK_PREPARE_FAILED",
+            error_stage="fallback_prepare",
+            fallback_status="prepare_failed",
+            warning_code="fallback_prepare_hint",
+        )
+    return FallbackFailureState(
+        error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
+        error_stage="fallback_retry",
+        fallback_status="retry_failed",
+        warning_code="fallback_retry_hint",
+    )
+
+
 def _record_primary_failure(result: dict[str, object], error_message: str) -> None:
     """Record the normalized primary-download failure state on the result."""
     _set_failure_state(
@@ -173,7 +231,7 @@ def _record_primary_download_warning(result: dict[str, object], error_message: s
     _append_warning(
         result,
         code=warning_code,
-        message=f"primary download failed and triggered selenium fallback: {error_message}",
+        message=_primary_warning_message(error_message),
         stage="primary_download",
     )
     _apply_warning_remediation(result, warning_code)
@@ -266,75 +324,44 @@ def _record_retry_context_state(result: dict[str, object], context: SeleniumCont
 
 def _fallback_exception_warning_code(exc: Exception) -> str:
     """Map retry-stage exceptions to their default warning code family."""
-    if isinstance(exc, DependencyMissingError):
-        return "fallback_dependency_hint"
-    if isinstance(exc, SeleniumFallbackError):
-        return "fallback_prepare_hint"
-    if isinstance(exc, DownloadError):
-        return "fallback_retry_hint"
+    if isinstance(exc, VlpError):
+        return _fallback_failure_state(exc).warning_code
     return "fallback_retry_unhandled_exception"
 
 
 def _handle_fallback_vlp_error(result: dict[str, object], exc: VlpError) -> None:
     """Record fallback-stage VlpError failures and optional hint warnings."""
-    if isinstance(exc, DependencyMissingError):
-        _set_failure_state(
+    failure_state = _fallback_failure_state(exc)
+    _set_failure_state(
+        result,
+        error=exc.message,
+        error_code=failure_state.error_code,
+        error_stage=failure_state.error_stage,
+        fallback_status=failure_state.fallback_status,
+    )
+    if failure_state.preferred_hint_code:
+        _set_result_hint(
             result,
-            error=exc.message,
-            error_code="DEPENDENCY_MISSING",
-            error_stage="fallback_dependency",
-            fallback_status="dependency_missing",
-        )
-        _set_result_hint(result, preferred_warning_hint("browser_driver_unavailable", exc.hint), overwrite=True)
-    elif isinstance(exc, SeleniumFallbackError):
-        _set_failure_state(
-            result,
-            error=exc.message,
-            error_code="DOWNLOAD_FALLBACK_PREPARE_FAILED",
-            error_stage="fallback_prepare",
-            fallback_status="prepare_failed",
-        )
-    elif isinstance(exc, DownloadError):
-        _set_failure_state(
-            result,
-            error=exc.message,
-            error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
-            error_stage="fallback_retry",
-            fallback_status="retry_failed",
+            preferred_warning_hint(failure_state.preferred_hint_code, exc.hint),
+            overwrite=True,
         )
 
     if exc.hint:
         _append_hint_warning(
             result,
             hint=exc.hint,
-            default_code=_fallback_exception_warning_code(exc),
+            default_code=failure_state.warning_code,
             stage=str(result["error_stage"] or "download"),
             overwrite_hint=False,
         )
 
 
 def _classify_primary_warning(error_message: str) -> str:
-    lowered = error_message.lower()
-    if "403" in lowered or "forbidden" in lowered:
-        return "primary_http_403"
-    if "captcha" in lowered or "verify you are human" in lowered or "verification" in lowered:
-        return "primary_captcha_required"
-    if "cookie" in lowered and ("database" in lowered or "locked" in lowered or "copy" in lowered):
-        return "browser_cookie_locked"
-    if "sign in" in lowered or "login required" in lowered:
-        return "primary_auth_required"
-    return "primary_download_failed"
+    return _classify_warning_message(error_message, default_code="primary_download_failed")
 
 
 def _classify_hint_warning(hint: str, *, default_code: str) -> str:
-    lowered = hint.lower()
-    if "could not copy database" in lowered or "database is locked" in lowered or "locked" in lowered:
-        return "browser_cookie_locked"
-    if "chromedriver" in lowered or "webdriver" in lowered:
-        return "browser_driver_unavailable"
-    if "ffmpeg" in lowered:
-        return "ffmpeg_unavailable"
-    return default_code
+    return _classify_warning_message(hint, default_code=default_code)
 
 
 def sanitize_filename(filename: str) -> str:
