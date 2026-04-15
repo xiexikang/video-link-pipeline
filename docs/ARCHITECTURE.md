@@ -709,6 +709,12 @@ Recommended command alignment:
 - Run tests with `python -m pytest`
 - Run packaging smoke checks with `python -m build`
 
+Local troubleshooting guidance should stay aligned with these commands:
+
+- missing `pytest`, `ruff`, or `build` modules should be treated first as a missing `dev` extra installation problem
+- `pip check` failures should be documented as environment consistency problems before they are treated as project-code regressions
+- Windows-specific docs should encourage checking `sys.executable` when users may have multiple Python interpreters installed
+
 Recommended follow-up:
 
 - Add Ubuntu for early regression detection in pure Python paths
