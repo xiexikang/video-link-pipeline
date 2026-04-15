@@ -433,10 +433,13 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 
 ## 已知状态
 
-- `vlp run` 和 `vlp doctor` 已经落地
-- 已补充基础测试与 Windows CI 配置
-- 当前环境下如果未安装 `pytest`，本地无法直接执行测试
-- Selenium fallback 目前仍在逐步完善，`doctor` 会先给出安装与诊断提示
+- `M1a / M1b / M1c` 对应的基础包化、命令迁移、`manifest.json` 接入与文档对齐已经基本完成
+- `vlp run` 和 `vlp doctor` 已经落地，现有主流程可以通过统一 CLI 使用
+- 下载链路已补充结构化 diagnostics、warning 分类和典型修复建议，`doctor` 会同步展示常见问题说明
+- 已补充基础测试、Windows CI 与本地校验脚本 `scripts/check.ps1`
+- 当前环境下如果未安装 `pytest`、`ruff` 或 `build`，本地无法完成完整开发校验
+- Selenium fallback 目前已具备真实浏览器兜底与部分站点线索提取能力，但仍在持续稳定化
+- 下一阶段重点是补足更多回归测试、完善下载失败分类，并继续打磨 fallback 在复杂站点上的成功率
 
 ## License
 

@@ -4,6 +4,25 @@
 
 Draft v1
 
+## Implementation Status
+
+The refactor has moved beyond the initial design stage and most v1 foundations are now in place.
+
+Current progress by milestone:
+
+- `M1a` is effectively complete: package metadata, `src/` layout, shared config/errors/logging/manifest modules, and compatibility wrappers are in place
+- `M1b` is effectively complete: `download`, `transcribe`, `summarize`, and `convert-subtitle` have been migrated behind the unified `vlp` CLI
+- `M1c` is effectively complete: `manifest.json` is written incrementally, job-directory normalization is implemented, and the docs have largely been realigned with the live config schema
+- `M2` is in progress but substantially delivered: `vlp doctor`, structured download diagnostics, warning classification, shared remediation guidance, baseline tests, Windows CI, and local dev-check scripts are already available
+- `M3` has a usable baseline: `vlp run` exists and updates `manifest.json`, with follow-up work focused on edge-case stabilization rather than first implementation
+
+What is still open:
+
+- Run the full local validation flow in an environment with the `dev` extra installed, especially `pytest`, `ruff`, `pip check`, and package build verification
+- Continue hardening Selenium fallback and site-specific media-hint extraction for harder platforms and anti-bot flows
+- Expand regression coverage around download diagnostics, retry paths, and manifest updates across partial-success scenarios
+- Optionally extend CI beyond Windows so pure Python paths are exercised on an additional platform
+
 ## Purpose
 
 This document defines the v1 maintainability refactor for `video-link-pipeline` (`vlp`).

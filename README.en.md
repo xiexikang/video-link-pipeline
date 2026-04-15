@@ -433,10 +433,13 @@ New usage should prefer `vlp`. The wrapper scripts now act as compatibility laye
 
 ## Current Status
 
-- `vlp run` and `vlp doctor` are implemented
-- Basic tests and a Windows CI workflow have been added
-- If `pytest` is not installed in the local environment, tests cannot be executed directly
-- Selenium fallback is still being refined; `doctor` currently focuses on install and diagnosis guidance
+- The `M1a / M1b / M1c` goals are largely in place: package migration, command consolidation, `manifest.json` integration, and documentation alignment are mostly complete
+- `vlp run` and `vlp doctor` are implemented, so the main workflow is available through the unified CLI
+- The download path now includes structured diagnostics, warning classification, and remediation guidance that is also surfaced through `doctor`
+- Basic tests, a Windows CI workflow, and the local validation script `scripts/check.ps1` have been added
+- If `pytest`, `ruff`, or `build` are not installed in the local environment, the full development validation flow cannot be executed
+- Selenium fallback now has a real browser-based fallback path plus partial site-hint extraction, but it is still being hardened
+- The next phase is focused on broader regression coverage, finer download failure classification, and more robust fallback behavior on difficult sites
 
 ## License
 
