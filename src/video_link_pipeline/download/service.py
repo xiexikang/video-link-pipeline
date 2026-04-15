@@ -225,6 +225,14 @@ def _record_primary_failure(result: dict[str, object], error_message: str) -> No
     )
 
 
+def _record_primary_exception(result: dict[str, object], exc: Exception) -> None:
+    """Normalize an exception raised on the primary path into result state."""
+    if isinstance(exc, DownloadError):
+        _record_primary_failure(result, exc.message)
+        return
+    _record_primary_failure(result, str(exc))
+
+
 def _record_primary_download_warning(result: dict[str, object], error_message: str) -> str:
     """Record the primary-download failure warning and set its best hint."""
     warning_code = _classify_primary_warning(error_message)
@@ -354,6 +362,23 @@ def _handle_fallback_vlp_error(result: dict[str, object], exc: VlpError) -> None
             stage=str(result["error_stage"] or "download"),
             overwrite_hint=False,
         )
+
+
+def _handle_unexpected_fallback_exception(result: dict[str, object], exc: Exception) -> None:
+    """Record non-domain fallback exceptions using the stable retry failure contract."""
+    _set_failure_state(
+        result,
+        error=str(exc),
+        error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
+        error_stage="fallback_retry",
+        fallback_status="retry_failed",
+    )
+    _append_hint_warning(
+        result,
+        hint=str(exc),
+        default_code=_fallback_exception_warning_code(exc),
+        stage="fallback_retry",
+    )
 
 
 def _classify_primary_warning(error_message: str) -> str:
@@ -705,6 +730,26 @@ def _origin_from_url(url: str | None) -> str | None:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _continue_after_primary_failure(
+    *,
+    result: dict[str, object],
+    output_dir: str | Path,
+    selenium_mode: str,
+    languages: list[str] | None,
+    quality: str,
+    audio_only: bool,
+) -> dict[str, object]:
+    """Continue from a normalized primary failure into optional fallback handling."""
+    return _handle_download_failure(
+        result=result,
+        output_dir=output_dir,
+        selenium_mode=selenium_mode,
+        languages=languages,
+        quality=quality,
+        audio_only=audio_only,
+    )
+
+
 def execute_download(
     *,
     url: str,
@@ -730,19 +775,9 @@ def execute_download(
             cookie_file=cookie_file,
             result=result,
         )
-    except DownloadError as exc:
-        _record_primary_failure(result, exc.message)
-        return _handle_download_failure(
-            result=result,
-            output_dir=output_dir,
-            selenium_mode=selenium_mode,
-            languages=languages,
-            quality=quality,
-            audio_only=audio_only,
-        )
     except Exception as exc:
-        _record_primary_failure(result, str(exc))
-        return _handle_download_failure(
+        _record_primary_exception(result, exc)
+        return _continue_after_primary_failure(
             result=result,
             output_dir=output_dir,
             selenium_mode=selenium_mode,
@@ -785,19 +820,7 @@ def _handle_download_failure(
         if isinstance(exc, VlpError):
             _handle_fallback_vlp_error(result, exc)
         else:
-            _set_failure_state(
-                result,
-                error=str(exc),
-                error_code="DOWNLOAD_FALLBACK_RETRY_FAILED",
-                error_stage="fallback_retry",
-                fallback_status="retry_failed",
-            )
-            _append_hint_warning(
-                result,
-                hint=str(exc),
-                default_code=_fallback_exception_warning_code(exc),
-                stage="fallback_retry",
-            )
+            _handle_unexpected_fallback_exception(result, exc)
         return result
 
 

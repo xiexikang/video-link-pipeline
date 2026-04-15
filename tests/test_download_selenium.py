@@ -15,9 +15,12 @@ from video_link_pipeline.download.service import (
     _apply_preparation_metadata,
     _build_fallback_context,
     _build_retry_headers,
+    _continue_after_primary_failure,
     _execute_primary_download,
     _handle_fallback_vlp_error,
+    _handle_unexpected_fallback_exception,
     _prepare_retry_download,
+    _record_primary_exception,
     _record_primary_failure,
     _record_retry_context_state,
     _fallback_exception_warning_code,
@@ -125,6 +128,22 @@ def test_record_primary_failure_sets_primary_download_error_state() -> None:
     assert result["error"] == "primary extractor failed"
     assert result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
     assert result["error_stage"] == "primary_download"
+
+
+def test_record_primary_exception_normalizes_download_and_generic_errors() -> None:
+    result = new_download_result("https://example.com/video")
+    _record_primary_exception(result, DownloadError("download path failed"))
+
+    assert result["error"] == "download path failed"
+    assert result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
+    assert result["error_stage"] == "primary_download"
+
+    generic_result = new_download_result("https://example.com/video")
+    _record_primary_exception(generic_result, RuntimeError("unexpected primary failure"))
+
+    assert generic_result["error"] == "unexpected primary failure"
+    assert generic_result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
+    assert generic_result["error_stage"] == "primary_download"
 
 
 def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) -> None:
@@ -395,6 +414,18 @@ def test_handle_fallback_vlp_error_records_retry_failure_without_overriding_exis
     assert result["hint"] == "existing primary hint"
 
 
+def test_handle_unexpected_fallback_exception_records_retry_failure() -> None:
+    result = new_download_result("https://example.com/video")
+
+    _handle_unexpected_fallback_exception(result, RuntimeError("unexpected fallback crash"))
+
+    assert result["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert result["error_stage"] == "fallback_retry"
+    assert result["fallback_status"] == "retry_failed"
+    assert result["warning_details"][0]["code"] == "fallback_retry_unhandled_exception"
+    assert result["warning_details"][0]["stage"] == "fallback_retry"
+
+
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
     result = {"warnings": [], "warning_details": []}
     context = SeleniumContext(
@@ -488,6 +519,35 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert result["warning_details"][1]["code"] == "fallback_dependency_hint"
     assert "pip install 'video-link-pipeline[selenium]'" in str(result["hint"])
     assert "optional dependencies are not installed" in str(result["error"])
+
+
+def test_continue_after_primary_failure_delegates_to_download_failure(monkeypatch, tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+    result["error"] = "HTTP Error 403: Forbidden"
+    captured: dict[str, object] = {}
+
+    def fake_handle_download_failure(**kwargs):
+        captured.update(kwargs)
+        return {"delegated": True}
+
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._handle_download_failure",
+        fake_handle_download_failure,
+    )
+
+    delegated = _continue_after_primary_failure(
+        result=result,
+        output_dir=tmp_path,
+        selenium_mode="auto",
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+    )
+
+    assert delegated == {"delegated": True}
+    assert captured["result"] is result
+    assert captured["output_dir"] == tmp_path
+    assert captured["selenium_mode"] == "auto"
 
 
 def test_execute_download_does_not_trigger_fallback_when_selenium_is_off(monkeypatch, tmp_path: Path) -> None:
