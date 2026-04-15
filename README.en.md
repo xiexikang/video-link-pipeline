@@ -327,6 +327,12 @@ The CLI download diagnostics now mirrors the same field names where practical so
 
 These `warning_details.code` values and `vlp doctor` guidance are backed by the same shared diagnostics catalog in `video_link_pipeline.download.diagnostics`. New warning codes should be added there first so doctor, manifest output, and docs stay aligned.
 
+The current download implementation is also being kept in three maintainable internal phases:
+
+- `primary path`: normal `yt-dlp` download and artifact normalization
+- `fallback prepare`: Selenium browser context, cookies export, and retry-signal extraction
+- `fallback retry`: retry `yt-dlp` with browser-derived context and classify final failures consistently
+
 ## Compatibility Wrappers
 
 These script entry points are still available:
