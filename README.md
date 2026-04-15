@@ -122,6 +122,19 @@ python -m pytest
 python -m build
 ```
 
+Windows / PowerShell 下也可以直接执行仓库脚本：
+
+```powershell
+./scripts/check.ps1
+```
+
+如果你只想跳过较重步骤，也可以：
+
+```powershell
+./scripts/check.ps1 -SkipPytest
+./scripts/check.ps1 -SkipBuild
+```
+
 如果当前环境还没安装 `pytest`，运行 `python -m pytest` 时会看到类似 `No module named pytest` 的报错。这时重新执行：
 
 ```bash
@@ -147,6 +160,7 @@ python -m pytest tests/test_download_diagnostics.py
 - 如果 `python -m build` 报 `No module named build`，说明当前环境不是最新的 `dev` 依赖，同样重新执行 `pip install -e .[dev]`
 - 如果 `python -m pip check` 报依赖冲突，优先确认你当前使用的是项目对应虚拟环境，再重新执行 `python -m pip install -e .[dev]`
 - Windows 下如果你切换过多个 Python 版本，建议先执行 `python -c "import sys; print(sys.executable)"`，确认当前命令落在预期解释器上
+- `scripts/check.ps1` 开头也会打印当前 `sys.executable`，便于快速确认脚本实际使用的是哪个 Python
 
 ## 配置
 
