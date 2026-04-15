@@ -420,6 +420,14 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 - `fallback prepare`：Selenium 浏览器上下文、cookies、重试线索提取
 - `fallback retry`：携带浏览器上下文重试 `yt-dlp` 并统一失败分类
 
+当前 `manifest.json` 的增量写入行为也已经按回归测试固定了几条约束：
+
+- `vlp download` 失败时，只要已经解析出 job 目录，仍会先写出 `manifest.json`，再由 CLI 抛错
+- `execution.download.error_code` 在下载失败但结果里未显式提供错误码时，会稳定回落成 `DOWNLOAD_FAILED`
+- `vlp run` 仅执行下载成功时，最终 `manifest.json` 会保留完整的 `execution.download` 诊断字段，不会凭空补出 `transcribe` 或 `summarize`
+- `vlp run` 在转录失败时，manifest 会保留下载成功结果，并以最近一次写入命令 `vlp transcribe` 结束，方便定位失败阶段
+- `vlp run` 在摘要失败时，manifest 会同时保留下载成功、转录成功和摘要失败状态，并以最近一次写入命令 `vlp summarize` 结束
+
 ## 兼容脚本
 
 以下脚本仍然可用，但定位已经变成兼容层：

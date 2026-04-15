@@ -420,6 +420,14 @@ The current download implementation is also being kept in three maintainable int
 - `fallback prepare`: Selenium browser context, cookies export, and retry-signal extraction
 - `fallback retry`: retry `yt-dlp` with browser-derived context and classify final failures consistently
 
+The current `manifest.json` update behavior is also now locked by regression tests around a few important guarantees:
+
+- when `vlp download` fails but a job directory has already been resolved, the CLI still writes `manifest.json` before raising the final error
+- `execution.download.error_code` falls back to `DOWNLOAD_FAILED` when the download result is unsuccessful and does not provide a more specific code
+- when `vlp run` completes after download only, the final `manifest.json` preserves the full `execution.download` diagnostics and does not synthesize `transcribe` or `summarize`
+- when `vlp run` fails during transcription, the manifest preserves the successful download state and ends with the most recent command value `vlp transcribe`
+- when `vlp run` fails during summarization, the manifest preserves download success, transcription success, and summarization failure, ending with the most recent command value `vlp summarize`
+
 ## Compatibility Wrappers
 
 These script entry points are still available:
