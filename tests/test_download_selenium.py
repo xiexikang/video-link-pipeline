@@ -12,6 +12,7 @@ from video_link_pipeline.download.selenium_fallback import (
 )
 from video_link_pipeline.download.service import (
     _append_hint_warning,
+    _apply_page_description,
     _apply_preparation_metadata,
     _build_fallback_context,
     _build_retry_headers,
@@ -26,11 +27,13 @@ from video_link_pipeline.download.service import (
     _fallback_exception_warning_code,
     _classify_hint_warning,
     _classify_primary_warning,
+    _missing_explicit_media_hint,
     _origin_from_url,
     _record_fallback_prepare_warnings,
     _record_primary_download_warning,
     _retry_with_selenium_context,
     _set_failure_state,
+    _set_prepared_fallback_context,
     DownloadPreparation,
     DownloadError,
     execute_download,
@@ -172,6 +175,39 @@ def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) ->
     }
 
 
+def test_missing_explicit_media_hint_detects_page_url_fallbacks(tmp_path: Path) -> None:
+    assert _missing_explicit_media_hint(
+        SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="dom",
+        )
+    ) is True
+    assert _missing_explicit_media_hint(
+        SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://cdn.example.com/video.m3u8",
+            site_name="example.com",
+            extraction_source="jsonld",
+        )
+    ) is False
+
+
 def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -> None:
     result = new_download_result("https://example.com/video")
     preparation = DownloadPreparation(
@@ -189,6 +225,30 @@ def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -
     assert result["title"] == "demo-title"
     assert result["folder"] == str(tmp_path / "job")
     assert result["ffmpeg_path"] == "C:/ffmpeg/bin/ffmpeg.exe"
+
+
+def test_apply_page_description_and_set_prepared_fallback_context(tmp_path: Path) -> None:
+    result = new_download_result("https://example.com/video")
+    context = SeleniumContext(
+        original_url="https://example.com/video",
+        resolved_url="https://example.com/resolved",
+        page_title="demo",
+        user_agent="ua",
+        referer="https://example.com/resolved",
+        cookie_file=tmp_path / "cookies.txt",
+        page_description="page description",
+        canonical_url="https://example.com/watch/demo",
+        media_hint_url="https://cdn.example.com/video.m3u8",
+        site_name="example.com",
+        extraction_source="jsonld",
+    )
+
+    _apply_page_description(result, context.page_description)
+    _set_prepared_fallback_context(result, context)
+
+    assert result["error"] == "page description"
+    assert result["fallback_status"] == "prepared"
+    assert result["fallback_context"]["media_hint_url"] == "https://cdn.example.com/video.m3u8"
 
 
 def test_build_retry_headers_prefers_canonical_url_and_origin(tmp_path: Path) -> None:

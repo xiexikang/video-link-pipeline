@@ -257,6 +257,13 @@ def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
     }
 
 
+def _missing_explicit_media_hint(context: SeleniumContext) -> bool:
+    return not context.media_hint_url or context.media_hint_url in {
+        context.resolved_url,
+        context.canonical_url,
+    }
+
+
 def _record_fallback_prepare_warnings(result: dict[str, object], context: SeleniumContext) -> None:
     """Record warnings emitted while preparing fallback browser context."""
     _append_warning(
@@ -265,10 +272,7 @@ def _record_fallback_prepare_warnings(result: dict[str, object], context: Seleni
         message=f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}",
         stage="fallback_prepare",
     )
-    if not context.media_hint_url or context.media_hint_url in {
-        context.resolved_url,
-        context.canonical_url,
-    }:
+    if _missing_explicit_media_hint(context):
         _append_warning(
             result,
             code="fallback_media_hint_missing",
@@ -323,9 +327,17 @@ def _prepare_retry_download(
 
 def _record_retry_context_state(result: dict[str, object], context: SeleniumContext) -> None:
     """Persist prepared fallback context and related warnings onto the result."""
-    if context.page_description and not result.get("error"):
-        result["error"] = context.page_description
+    _apply_page_description(result, context.page_description)
     _record_fallback_prepare_warnings(result, context)
+    _set_prepared_fallback_context(result, context)
+
+
+def _apply_page_description(result: dict[str, object], page_description: str | None) -> None:
+    if page_description and not result.get("error"):
+        result["error"] = page_description
+
+
+def _set_prepared_fallback_context(result: dict[str, object], context: SeleniumContext) -> None:
     result["fallback_context"] = _build_fallback_context(context)
     result["fallback_status"] = "prepared"
 
