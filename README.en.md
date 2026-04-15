@@ -140,6 +140,14 @@ CI now also runs two extra lightweight checks:
 - `python -m pip check`: verifies that installed dependency requirements are not in conflict
 - `python -m build`: verifies that the repository can still build both sdist and wheel artifacts
 
+Common local troubleshooting tips:
+
+- If `python -m pytest` fails with `No module named pytest`, the current interpreter does not have the `dev` extra installed yet; run `pip install -e .[dev]`
+- If `python -m ruff check .` fails with `No module named ruff`, reinstall the `dev` extra in the current environment
+- If `python -m build` fails with `No module named build`, the active environment is missing the latest `dev` dependencies; run `pip install -e .[dev]` again
+- If `python -m pip check` reports dependency conflicts, first confirm you are using the intended virtual environment, then reinstall with `python -m pip install -e .[dev]`
+- On Windows, if you switch between multiple Python versions, `python -c "import sys; print(sys.executable)"` is a quick way to verify which interpreter is actually running these commands
+
 ## Configuration
 
 The default config file is `config.yaml` in the repository root.

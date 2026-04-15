@@ -140,6 +140,14 @@ python -m pytest tests/test_download_diagnostics.py
 - `python -m pip check`：检查安装后的依赖约束是否冲突
 - `python -m build`：验证当前仓库仍然可以正常构建 sdist / wheel
 
+常见本地排查提示：
+
+- 如果 `python -m pytest` 报 `No module named pytest`，说明当前解释器还没装 `dev` 依赖，重新执行 `pip install -e .[dev]`
+- 如果 `python -m ruff check .` 报 `No module named ruff`，处理方式同上，重新安装 `dev` 依赖
+- 如果 `python -m build` 报 `No module named build`，说明当前环境不是最新的 `dev` 依赖，同样重新执行 `pip install -e .[dev]`
+- 如果 `python -m pip check` 报依赖冲突，优先确认你当前使用的是项目对应虚拟环境，再重新执行 `python -m pip install -e .[dev]`
+- Windows 下如果你切换过多个 Python 版本，建议先执行 `python -c "import sys; print(sys.executable)"`，确认当前命令落在预期解释器上
+
 ## 配置
 
 默认配置文件是项目根目录下的 `config.yaml`。
