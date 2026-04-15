@@ -12,6 +12,7 @@ from video_link_pipeline.download.selenium_fallback import (
 )
 from video_link_pipeline.download.service import (
     _append_hint_warning,
+    _append_warning_with_hint,
     _apply_page_description,
     _apply_preparation_metadata,
     _build_fallback_context,
@@ -526,6 +527,54 @@ def test_append_hint_warning_does_not_override_existing_hint_by_default() -> Non
     assert result["warning_details"][0]["code"] == "ffmpeg_unavailable"
     assert result["warning_details"][0]["stage"] == "fallback_retry"
     assert result["hint"] == "existing primary hint"
+
+
+def test_append_warning_with_hint_prefers_shared_remediation() -> None:
+    result = {
+        "warnings": [],
+        "warning_details": [],
+        "hint": None,
+    }
+
+    _append_warning_with_hint(
+        result,
+        code="browser_driver_unavailable",
+        message="chromedriver is missing",
+        stage="fallback_prepare",
+        fallback_hint="custom fallback hint",
+    )
+
+    assert result["warning_details"][0]["code"] == "browser_driver_unavailable"
+    assert result["hint"] == "Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally."
+
+
+def test_append_warning_with_hint_uses_fallback_hint_when_no_shared_remediation() -> None:
+    result = {
+        "warnings": [],
+        "warning_details": [],
+        "hint": "existing primary hint",
+    }
+
+    _append_warning_with_hint(
+        result,
+        code="fallback_retry_hint",
+        message="custom retry hint",
+        stage="fallback_retry",
+        fallback_hint="custom retry hint",
+        overwrite_hint=False,
+    )
+    assert result["hint"] == "existing primary hint"
+
+    _append_warning_with_hint(
+        result,
+        code="fallback_retry_hint",
+        message="custom retry hint override",
+        stage="fallback_retry",
+        fallback_hint="custom retry hint override",
+        overwrite_hint=True,
+    )
+
+    assert result["hint"] == "custom retry hint override"
 
 
 def test_append_hint_warning_can_override_hint_when_requested() -> None:
