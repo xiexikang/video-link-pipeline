@@ -401,6 +401,29 @@ Representative warning codes include:
 - `fallback_prepare_hint`
 - `fallback_retry_hint`
 
+### Download Execution Phases
+
+The internal download flow should remain split into a small number of explicit phases so that
+diagnostics, manifests, and future refactors can evolve without reworking the whole service:
+
+1. `primary path`
+   Runs the normal `yt-dlp` download flow, writes common preparation metadata, validates produced artifacts,
+   and returns the success result when no anti-crawling or download failure is encountered.
+2. `fallback prepare`
+   Runs Selenium only after a qualifying failure, exports browser cookies, resolves the browser-derived retry URL,
+   captures `fallback_context`, and emits preparation warnings such as `fallback_context_prepared` or
+   `fallback_media_hint_missing`.
+3. `fallback retry`
+   Re-runs `yt-dlp` with browser-derived headers and cookie state, then records either `succeeded`,
+   `retry_failed`, or a more specific dependency / prepare failure state when retry cannot proceed.
+
+Phase boundaries should stay visible in code through small helpers so the following concerns remain isolated:
+
+- primary success path and artifact normalization
+- primary failure classification and warning generation
+- fallback preparation state and context serialization
+- fallback retry request preparation, execution, and final failure mapping
+
 ## Module Responsibilities
 
 ### `video_link_pipeline.cli`
@@ -442,6 +465,7 @@ Representative warning codes include:
 - Optionally invokes Selenium fallback
 - Emits structured download diagnostics for manifest and CLI output
 - Maintains the shared warning-code catalog used by download results, doctor guidance, and documentation
+- Keeps the implementation organized around `primary path`, `fallback prepare`, and `fallback retry` helper boundaries
 
 ### `video_link_pipeline.transcribe`
 
@@ -541,6 +565,12 @@ Behavior:
 - If Selenium extra is not installed, emit a short actionable hint instead of a confusing traceback
 - If Selenium extra is installed and mode allows it, attempt fallback extraction
 - `vlp doctor` should also flag risky combinations such as `selenium=off` with no cookie source or both `cookies_from_browser` and `cookie_file` being set
+
+Recommended internal phase mapping:
+
+- `primary path`: probe, prepare download, execute `yt-dlp`, normalize artifacts
+- `fallback prepare`: launch browser, derive retry headers/cookies/context, emit preparation warnings
+- `fallback retry`: retry `yt-dlp` with browser-derived state, then classify dependency / prepare / retry failures
 
 Supported values:
 

@@ -327,6 +327,12 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 
 这些 `warning_details.code` 与 `vlp doctor` 使用的是同一份共享诊断索引，当前统一维护在 `video_link_pipeline.download.diagnostics` 中，后续新增诊断码也应优先补这里，再同步消费方。
 
+当前下载实现内部也已经按阶段收口为三段，便于长期维护：
+
+- `primary path`：常规 `yt-dlp` 下载与产物标准化
+- `fallback prepare`：Selenium 浏览器上下文、cookies、重试线索提取
+- `fallback retry`：携带浏览器上下文重试 `yt-dlp` 并统一失败分类
+
 ## 兼容脚本
 
 以下脚本仍然可用，但定位已经变成兼容层：
