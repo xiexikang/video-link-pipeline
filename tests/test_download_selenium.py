@@ -5,6 +5,7 @@ from pathlib import Path
 from video_link_pipeline.download.cookies import CookieSource
 from video_link_pipeline.download.selenium_fallback import (
     SeleniumContext,
+    SeleniumFallbackError,
     choose_best_media_hint,
     extract_page_signals_from_html,
     should_attempt_selenium_fallback,
@@ -28,6 +29,7 @@ from video_link_pipeline.download.service import (
     _retry_with_selenium_context,
     _set_failure_state,
     DownloadPreparation,
+    DownloadError,
     execute_download,
     new_download_result,
 )
@@ -335,6 +337,44 @@ def test_handle_fallback_vlp_error_records_dependency_failure_and_hint() -> None
     assert "Install the Selenium extra" in str(result["hint"])
 
 
+def test_handle_fallback_vlp_error_records_prepare_failure_with_stage_hint() -> None:
+    result = new_download_result("https://example.com/video")
+
+    _handle_fallback_vlp_error(
+        result,
+        SeleniumFallbackError(
+            "selenium fallback could not prepare browser context",
+            hint="chromedriver could not be found",
+        ),
+    )
+
+    assert result["error_code"] == "DOWNLOAD_FALLBACK_PREPARE_FAILED"
+    assert result["error_stage"] == "fallback_prepare"
+    assert result["fallback_status"] == "prepare_failed"
+    assert result["warning_details"][0]["code"] == "browser_driver_unavailable"
+    assert "chromedriver" in result["warning_details"][0]["message"]
+    assert result["hint"] == "Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally."
+
+
+def test_handle_fallback_vlp_error_records_retry_failure_without_overriding_existing_hint() -> None:
+    result = new_download_result("https://example.com/video")
+    result["hint"] = "existing primary hint"
+
+    _handle_fallback_vlp_error(
+        result,
+        DownloadError(
+            "retry download failed",
+            hint="ffmpeg is required for merge",
+        ),
+    )
+
+    assert result["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert result["error_stage"] == "fallback_retry"
+    assert result["fallback_status"] == "retry_failed"
+    assert result["warning_details"][0]["code"] == "ffmpeg_unavailable"
+    assert result["hint"] == "existing primary hint"
+
+
 def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) -> None:
     result = {"warnings": [], "warning_details": []}
     context = SeleniumContext(
@@ -428,6 +468,36 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert result["warning_details"][1]["code"] == "fallback_dependency_hint"
     assert "pip install 'video-link-pipeline[selenium]'" in str(result["hint"])
     assert "optional dependencies are not installed" in str(result["error"])
+
+
+def test_execute_download_does_not_trigger_fallback_when_selenium_is_off(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service.probe_download",
+        lambda **_: (_ for _ in ()).throw(Exception("HTTP Error 403: Forbidden")),
+    )
+    fallback_called = {"value": False}
+
+    def fake_run_selenium_browser_context(**_: object):
+        fallback_called["value"] = True
+        raise AssertionError("fallback should not run when selenium=off")
+
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service.run_selenium_browser_context",
+        fake_run_selenium_browser_context,
+    )
+
+    result = execute_download(
+        url="https://example.com/video",
+        output_dir=tmp_path,
+        selenium_mode="off",
+    )
+
+    assert fallback_called["value"] is False
+    assert result["success"] is False
+    assert result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
+    assert result["error_stage"] == "primary_download"
+    assert result["fallback_status"] == "not_attempted"
+    assert result["warning_details"] == []
 
 
 def test_execute_download_marks_used_selenium_fallback(monkeypatch, tmp_path: Path) -> None:
