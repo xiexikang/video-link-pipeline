@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+SUPPORTED_BROWSER_NAMES = ("chrome", "edge", "firefox", "opera", "brave", "vivaldi", "safari")
+
 WARNING_CODES = {
     "primary_download_failed": "Primary download failed without a more specific classification.",
     "primary_http_403": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction.",
@@ -52,6 +54,24 @@ class WarningCatalogEntry:
     remediation: str | None = None
 
 
+def supported_browser_names() -> tuple[str, ...]:
+    return SUPPORTED_BROWSER_NAMES
+
+
+def supported_browsers_hint() -> str:
+    return f"supported browsers: {', '.join(SUPPORTED_BROWSER_NAMES)}"
+
+
+def selenium_extra_install_hint() -> str:
+    return "install with: pip install 'video-link-pipeline[selenium]'"
+
+
+def cookie_file_export_hint(*, missing: bool) -> str:
+    if missing:
+        return "export a Netscape-format cookies.txt file and point --cookie-file to it"
+    return "make sure the file is in Netscape cookies.txt format if download authentication still fails"
+
+
 def warning_code_description(code: str) -> str | None:
     return WARNING_CODES.get(code)
 
@@ -75,6 +95,18 @@ def warning_catalog() -> list[WarningCatalogEntry]:
 
 def warning_catalog_codes() -> list[str]:
     return [entry.code for entry in warning_catalog()]
+
+
+def warning_reference_lines(codes: list[str]) -> list[str]:
+    lines: list[str] = []
+    for code in codes:
+        description = warning_code_description(code)
+        remediation = warning_code_remediation(code)
+        if description:
+            lines.append(f"{code}: {description}")
+        if remediation:
+            lines.append(f"{code} fix: {remediation}")
+    return lines
 
 
 def preferred_warning_hint(code: str, fallback_hint: str | None = None) -> str | None:

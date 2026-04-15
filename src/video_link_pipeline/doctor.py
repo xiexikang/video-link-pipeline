@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from .download.diagnostics import (
+    cookie_file_export_hint,
     preferred_warning_hint,
+    supported_browsers_hint,
     warning_catalog,
-    warning_code_description,
-    warning_code_remediation,
+    warning_reference_lines,
 )
 from .download.cookies import KNOWN_BROWSERS
 from .transcribe.ffmpeg import resolve_ffmpeg_executable
@@ -57,19 +58,14 @@ def run_checks(config: dict[str, Any] | None = None) -> list[DoctorCheck]:
 
 
 def doctor_guidance(checks: list[DoctorCheck]) -> list[str]:
-    lines: list[str] = []
     seen: set[str] = set()
+    codes: list[str] = []
     for check in checks:
         if not check.code or check.code in seen:
             continue
-        description = warning_code_description(check.code)
-        remediation = warning_code_remediation(check.code)
-        if description:
-            lines.append(f"{check.code}: {description}")
-        if remediation:
-            lines.append(f"{check.code} fix: {remediation}")
         seen.add(check.code)
-    return lines
+        codes.append(check.code)
+    return warning_reference_lines(codes)
 
 
 def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]:
@@ -85,17 +81,8 @@ def doctor_reference_lines(checks: list[DoctorCheck] | None = None) -> list[str]
         if entry.code not in wanted_set:
             continue
         rendered.add(entry.code)
-    ordered_lines: list[str] = []
-    for code in wanted:
-        if code not in rendered:
-            continue
-        description = warning_code_description(code)
-        remediation = warning_code_remediation(code)
-        if description:
-            ordered_lines.append(f"{code}: {description}")
-        if remediation:
-            ordered_lines.append(f"{code} fix: {remediation}")
-    return ordered_lines
+    ordered_codes = [code for code in wanted if code in rendered]
+    return warning_reference_lines(ordered_codes)
 
 
 def doctor_reference_lines_for_remaining_codes(checks: list[DoctorCheck]) -> list[str]:
@@ -206,7 +193,7 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
                     detail=f"configured browser cookies source is not recognized: {browser}",
                     section="download_prerequisites",
                     code="browser_cookie_locked",
-                    hint="supported browsers: chrome, edge, firefox, opera, brave, vivaldi, safari",
+                    hint=supported_browsers_hint(),
                 )
             ]
 
@@ -231,10 +218,10 @@ def _check_cookie_configuration(config: dict[str, Any]) -> list[DoctorCheck]:
         detail = f"configured cookie file: {path}"
         if ok:
             detail = f"{detail} exists=yes"
-            hint = "make sure the file is in Netscape cookies.txt format if download authentication still fails"
+            hint = cookie_file_export_hint(missing=False)
         else:
             detail = f"{detail} exists=no"
-            hint = "export a Netscape-format cookies.txt file and point --cookie-file to it"
+            hint = cookie_file_export_hint(missing=True)
         return [
             DoctorCheck(
                 name="cookies",

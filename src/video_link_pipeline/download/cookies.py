@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .diagnostics import supported_browser_names, supported_browsers_hint
 from ..errors import ConfigError, InputNotFoundError
 
-KNOWN_BROWSERS = {"chrome", "edge", "firefox", "opera", "brave", "vivaldi", "safari"}
+KNOWN_BROWSERS = set(supported_browser_names())
 
 
 @dataclass(slots=True)
@@ -81,7 +82,7 @@ def normalize_cookie_source(
 
     raise ConfigError(
         f"unknown browser name or cookie file path: {cookies_from_browser}",
-        hint="supported browsers: chrome, edge, firefox, opera, brave, vivaldi, safari",
+        hint=supported_browsers_hint(),
     )
 
 

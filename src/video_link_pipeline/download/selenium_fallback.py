@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .diagnostics import selenium_extra_install_hint
 from ..errors import DependencyMissingError, VlpError
 
 ANTI_CRAWL_MARKERS = (
@@ -86,7 +87,7 @@ def run_selenium_browser_context(*, url: str, workspace_dir: str | Path) -> Sele
     if not selenium_extra_available():
         raise DependencyMissingError(
             "selenium fallback requested but optional dependencies are not installed",
-            hint="install with: pip install 'video-link-pipeline[selenium]'",
+            hint=selenium_extra_install_hint(),
         )
 
     from selenium import webdriver
