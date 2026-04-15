@@ -64,6 +64,39 @@ Within the `config risks` section, the output levels mean:
 - `WARN`: a real conflict, invalid configuration, or something that may directly block the workflow
 - `INFO`: the current configuration is still usable, but the item is worth attention and should not be treated as a hard failure
 
+A compact `vlp doctor` output example:
+
+```text
+[INFO] config source=config.yaml
+[INFO] output_dir=./output
+[INFO] summary provider=claude
+[INFO] runtime:
+[OK] python: Python 3.11.0
+[OK] python_env: python executable: C:\Python311\python.exe
+[INFO] download prerequisites:
+[WARN] ffmpeg: ffmpeg missing
+[INFO] hint: install ffmpeg and ensure it is available in PATH
+[OK] selenium: selenium extra is available: selenium=yes webdriver-manager=yes
+[INFO] effective download config:
+[OK] download_effective_summary: effective download config summary: selenium=off cookies_from_browser=none cookie_file=none
+[OK] download_selenium: effective download.selenium=off
+[INFO] config risks:
+[INFO] download_config: download selenium=off and no cookie source is configured
+[INFO] hint: sites that require login or anti-bot verification may fail without cookies or fallback
+[INFO] common diagnostic guidance:
+[INFO] - ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail.
+[INFO] - ffmpeg_unavailable fix: install ffmpeg and ensure it is available in PATH
+[INFO] known diagnostic codes:
+[INFO] - primary_auth_required: Primary download requires login or account access.
+[WARN] doctor found items that may block some workflows
+```
+
+Notes:
+
+- `common diagnostic guidance` only shows diagnostic codes that are actually active in the current checks
+- `known diagnostic codes` only supplements common codes that were not already shown in guidance
+- even if the same diagnostic code appears in multiple checks, the CLI prints a single guidance/reference entry to keep output readable and stable for automation
+
 Quick verification:
 
 ```bash

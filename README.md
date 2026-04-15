@@ -64,6 +64,39 @@ pip install -e .[dev]
 - `WARN`：已经存在明显冲突、无效配置或可能直接阻塞流程的问题
 - `INFO`：当前配置可运行，但属于“值得注意”的建议项，不表示硬错误
 
+一个精简的 `vlp doctor` 输出示例如下：
+
+```text
+[INFO] config source=config.yaml
+[INFO] output_dir=./output
+[INFO] summary provider=claude
+[INFO] runtime:
+[OK] python: Python 3.11.0
+[OK] python_env: python executable: C:\Python311\python.exe
+[INFO] download prerequisites:
+[WARN] ffmpeg: ffmpeg missing
+[INFO] hint: install ffmpeg and ensure it is available in PATH
+[OK] selenium: selenium extra is available: selenium=yes webdriver-manager=yes
+[INFO] effective download config:
+[OK] download_effective_summary: effective download config summary: selenium=off cookies_from_browser=none cookie_file=none
+[OK] download_selenium: effective download.selenium=off
+[INFO] config risks:
+[INFO] download_config: download selenium=off and no cookie source is configured
+[INFO] hint: sites that require login or anti-bot verification may fail without cookies or fallback
+[INFO] common diagnostic guidance:
+[INFO] - ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail.
+[INFO] - ffmpeg_unavailable fix: install ffmpeg and ensure it is available in PATH
+[INFO] known diagnostic codes:
+[INFO] - primary_auth_required: Primary download requires login or account access.
+[WARN] doctor found items that may block some workflows
+```
+
+补充说明：
+
+- `common diagnostic guidance` 只展示当前检查里实际命中的诊断码及修复建议
+- `known diagnostic codes` 只补充当前未命中的常见码，避免和 guidance 重复
+- 同一个诊断码即使在多个检查项里重复出现，CLI 也只会打印一份 guidance/reference，便于阅读和后续统计
+
 安装完成后可以先检查命令是否可用：
 
 ```bash
