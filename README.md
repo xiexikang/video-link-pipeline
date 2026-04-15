@@ -112,7 +112,53 @@ vlp doctor
 pip install -e .[dev]
 ```
 
-与当前 CI 保持一致的最小验证命令：
+推荐按下面这个顺序做本地验证：
+
+1. 先确认当前 Python 解释器是你预期的环境
+
+```bash
+python -c "import sys; print(sys.executable)"
+```
+
+2. 先跑一组轻量检查，确认代码至少可以导入、编译、构建
+
+```bash
+python -m pip check
+python -m compileall src tests
+python -m build
+```
+
+3. 再跑静态检查和测试
+
+```bash
+python -m ruff check .
+python -m pytest
+```
+
+与当前 CI / 本地脚本对应的最小验证矩阵如下：
+
+| 检查项 | 推荐命令 | 目的 | 是否需要 `.[dev]` |
+| --- | --- | --- | --- |
+| 依赖一致性 | `python -m pip check` | 检查当前环境是否有依赖冲突 | 否 |
+| 语法/可导入性 | `python -m compileall src tests` | 提前发现语法错误和明显导入问题 | 否 |
+| 静态检查 | `python -m ruff check .` | 发现风格和部分低成本问题 | 是 |
+| 单元测试 | `python -m pytest` | 运行当前回归测试集 | 是 |
+| 构建验证 | `python -m build` | 验证 sdist / wheel 可正常构建 | 是 |
+| PowerShell 汇总脚本 | `./scripts/check.ps1` | 按仓库默认顺序执行本地检查 | 视是否跳过 `ruff` / `pytest` / `build` 而定 |
+
+如果你只想做一轮最快速的“轻量自检”，推荐先执行：
+
+```bash
+python -m compileall src tests
+```
+
+或者在 Windows / PowerShell 下执行：
+
+```powershell
+./scripts/check.ps1 -SkipPipCheck -SkipRuff -SkipPytest -SkipBuild
+```
+
+如果你希望完全对齐当前 CI，执行：
 
 ```bash
 python -m pip check
@@ -133,6 +179,7 @@ Windows / PowerShell 下也可以直接执行仓库脚本：
 ```powershell
 ./scripts/check.ps1 -SkipPytest
 ./scripts/check.ps1 -SkipBuild
+./scripts/check.ps1 -SkipPipCheck -SkipCompileAll -SkipRuff -SkipPytest -SkipBuild
 ```
 
 如果当前环境还没安装 `pytest`，运行 `python -m pytest` 时会看到类似 `No module named pytest` 的报错。这时重新执行：
@@ -161,6 +208,7 @@ python -m pytest tests/test_download_diagnostics.py
 - 如果 `python -m pip check` 报依赖冲突，优先确认你当前使用的是项目对应虚拟环境，再重新执行 `python -m pip install -e .[dev]`
 - Windows 下如果你切换过多个 Python 版本，建议先执行 `python -c "import sys; print(sys.executable)"`，确认当前命令落在预期解释器上
 - `scripts/check.ps1` 开头也会打印当前 `sys.executable`，便于快速确认脚本实际使用的是哪个 Python
+- 如果你只是想确认最近文档/测试改动没有引入语法问题，`python -m compileall src tests` 是当前成本最低的一步
 
 ## 配置
 
