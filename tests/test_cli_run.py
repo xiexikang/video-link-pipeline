@@ -535,3 +535,67 @@ def test_run_command_do_summary_reuses_existing_summary_without_resummarizing(mo
     assert manifest["execution"]["summarize"]["reused_existing"] is True
     assert manifest["execution"]["summarize"]["provider"] is None
     assert manifest["execution"]["summarize"]["warnings"] == ["reused existing summary"]
+
+
+def test_run_command_do_summary_reuses_existing_transcript_and_summary(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "video-reuse-both-demo"
+    job_dir.mkdir(parents=True)
+    transcript = job_dir / "transcript.txt"
+    summary = job_dir / "summary.md"
+    keywords = job_dir / "keywords.json"
+    transcript_json = job_dir / "transcript.json"
+    transcript.write_text("existing transcript", encoding="utf-8")
+    summary.write_text("# Existing Summary", encoding="utf-8")
+    keywords.write_text("{}", encoding="utf-8")
+    transcript_json.write_text("{}", encoding="utf-8")
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path, output_root)
+    calls = {"transcribe": 0, "summarize": 0}
+
+    def fake_download(**_: object) -> dict[str, object]:
+        (job_dir / "video.mp4").write_text("video", encoding="utf-8")
+        return {
+            "success": True,
+            "folder": "video-reuse-both-demo",
+            "video": "video-reuse-both-demo/video.mp4",
+            "audio": None,
+            "subtitle": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": False,
+            "error": None,
+        }
+
+    def fake_transcribe(**_: object) -> dict[str, object]:
+        calls["transcribe"] += 1
+        raise AssertionError("transcribe should not be called when transcript.txt already exists")
+
+    def fake_summarize(**_: object) -> dict[str, object]:
+        calls["summarize"] += 1
+        raise AssertionError("summarize should not be called when summary.md already exists")
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+    monkeypatch.setattr("video_link_pipeline.cli.transcribe_path", fake_transcribe)
+    monkeypatch.setattr("video_link_pipeline.cli.summarize_transcript", fake_summarize)
+
+    result = runner.invoke(app, ["run", "https://example.com/video", "--do-summary", "--config", str(config_path)])
+
+    assert result.exit_code == 0, result.stdout
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert calls["transcribe"] == 0
+    assert calls["summarize"] == 0
+    assert manifest["command"] == "vlp run"
+    assert manifest["artifacts"]["transcript_txt"] == "video-reuse-both-demo/transcript.txt"
+    assert manifest["artifacts"]["transcript_json"] == "video-reuse-both-demo/transcript.json"
+    assert manifest["artifacts"]["summary_md"] == "video-reuse-both-demo/summary.md"
+    assert manifest["artifacts"]["keywords_json"] == "video-reuse-both-demo/keywords.json"
+    assert manifest["execution"]["download"]["success"] is True
+    assert manifest["execution"]["transcribe"]["success"] is True
+    assert manifest["execution"]["transcribe"]["reused_existing"] is True
+    assert manifest["execution"]["transcribe"]["warnings"] == ["reused existing transcript"]
+    assert manifest["execution"]["summarize"]["success"] is True
+    assert manifest["execution"]["summarize"]["reused_existing"] is True
+    assert manifest["execution"]["summarize"]["warnings"] == ["reused existing summary"]
