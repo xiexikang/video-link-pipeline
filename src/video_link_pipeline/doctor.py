@@ -38,7 +38,9 @@ COMMON_DOCTOR_WARNING_CODES = [
     "ffmpeg_unavailable",
     "primary_auth_required",
     "primary_http_403",
-    "fallback_media_hint_missing",
+    "fallback_media_hint_missing_page_only",
+    "fallback_media_hint_missing_inline_only",
+    "fallback_media_hint_missing_structured",
 ]
 
 

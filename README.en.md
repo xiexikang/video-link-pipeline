@@ -508,6 +508,14 @@ Suggested crosswalk for common codes:
 | `fallback_prepare_hint` | download manifest / download CLI | Extra hint emitted when fallback preparation failed | Inspect browser launch, cookies export, and page-signal extraction |
 | `fallback_retry_hint` | download manifest / download CLI | Extra hint emitted when fallback retry failed | Inspect retry headers, cookies, and media hint quality |
 
+If you are actively improving site compatibility, these codes usually suggest the following next steps:
+
+- `fallback_media_hint_missing_page_only`: improve page-level cue detection first, such as more reliable `video/source`, `og:*`, `twitter:*`, `canonical`, or short-video-specific DOM markers.
+- `fallback_media_hint_missing_inline_only`: prioritize deeper inline script parsing, including `JSON.parse(...)`, state assignments without `window.`, and site-specific script fragments.
+- `fallback_media_hint_missing_structured`: structured entry points were already found, so focus on field mapping next, such as `playAddr`, `dash.url`, `streamUrl`, `contentUrl`, `m3u8`, and similar nested keys.
+- If `fallback_context.extraction_kind` is `window_state` but the code is still `fallback_media_hint_missing_structured`, the next likely gap is nested state traversal or missing field coverage.
+- If `fallback_context.extraction_kind` is `inline_html` or `inline_script` without upgrading to a structured source, the current behavior is still relying mostly on URL-regex fallback and should be promoted to more stable state parsing later.
+
 The current download implementation is also being kept in three maintainable internal phases:
 
 - `primary path`: normal `yt-dlp` download and artifact normalization

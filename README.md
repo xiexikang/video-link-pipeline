@@ -508,6 +508,14 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 | `fallback_prepare_hint` | download manifest / download CLI | fallback 准备阶段失败时的补充提示 | 看浏览器启动、cookies 导出、页面线索提取链路 |
 | `fallback_retry_hint` | download manifest / download CLI | fallback 重试阶段失败时的补充提示 | 看 headers/cookies/media hint 是否正确 |
 
+如果你是在补站点适配，看到这几个 code 时，通常可以按下面的顺序排查：
+
+- `fallback_media_hint_missing_page_only`：先补页面级 cue 检测，例如更稳的 `video/source`、`og:*`、`twitter:*`、`canonical`、短视频页专用 DOM 标记。
+- `fallback_media_hint_missing_inline_only`：优先补 inline script / `JSON.parse(...)` / 无 `window.` 前缀状态赋值 / 特定站点脚本片段解析。
+- `fallback_media_hint_missing_structured`：说明已经命中了 `meta`、`JSON-LD`、`__NEXT_DATA__`、`window.__DATA__` 这类结构化入口，下一步应重点补字段映射，例如 `playAddr`、`dash.url`、`streamUrl`、`contentUrl`、`m3u8`。
+- 如果 `fallback_context.extraction_kind` 是 `window_state` 但仍是 `fallback_media_hint_missing_structured`，通常优先补状态对象里的字段遍历或嵌套路径覆盖。
+- 如果 `fallback_context.extraction_kind` 是 `inline_html` 或 `inline_script`，但没有升级到结构化 source，说明当前更多只是 URL 正则兜底，后续应尽量把它提升成稳定状态解析。
+
 当前下载实现内部也已经按阶段收口为三段，便于长期维护：
 
 - `primary path`：常规 `yt-dlp` 下载与产物标准化

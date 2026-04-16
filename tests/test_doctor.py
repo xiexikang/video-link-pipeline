@@ -374,7 +374,9 @@ def test_doctor_reference_lines_include_common_codes_and_fixes() -> None:
     assert any(line.startswith("ffmpeg_unavailable:") for line in lines)
     assert any(line.startswith("primary_auth_required:") for line in lines)
     assert any(line.startswith("primary_http_403:") for line in lines)
-    assert any(line.startswith("fallback_media_hint_missing:") for line in lines)
+    assert any(line.startswith("fallback_media_hint_missing_page_only:") for line in lines)
+    assert any(line.startswith("fallback_media_hint_missing_inline_only:") for line in lines)
+    assert any(line.startswith("fallback_media_hint_missing_structured:") for line in lines)
 
 
 def test_doctor_reference_lines_prioritize_current_check_codes() -> None:
@@ -425,6 +427,7 @@ def test_doctor_reference_lines_for_remaining_codes_excludes_active_codes() -> N
     assert not any(line.startswith("browser_cookie_locked:") for line in lines)
     assert any(line.startswith("primary_auth_required:") for line in lines)
     assert any(line.startswith("primary_http_403:") for line in lines)
+    assert any(line.startswith("fallback_media_hint_missing_structured:") for line in lines)
 
 
 def test_run_checks_reports_conflicting_cookie_sources(monkeypatch, tmp_path: Path) -> None:
