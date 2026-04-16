@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    timeout-minutes: 30
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -20,6 +21,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Show Python runtime
+        run: |
+          python -c "import sys; print(sys.executable)"
+          python -c "import sys; print(sys.version)"
 
       - name: Install dependencies
         run: |
@@ -36,7 +42,7 @@ jobs:
         run: python -m ruff check .
 
       - name: Pytest
-        run: python -m pytest
+        run: python -m pytest -q
 
       - name: Build package
         run: python -m build

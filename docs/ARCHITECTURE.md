@@ -722,14 +722,19 @@ Minimum GitHub Actions coverage:
 - Python 3.10 and 3.11
 - `ruff`
 - `pytest`
+- `pip check`
+- `compileall`
+- package build validation
+- Python runtime visibility in logs
 
 Recommended command alignment:
 
 - Install dependencies with `python -m pip install -e .[dev]`
+- Print `sys.executable` and `sys.version` before validation steps
 - Run dependency validation with `python -m pip check`
 - Run syntax smoke checks with `python -m compileall src tests`
 - Run lint with `python -m ruff check .`
-- Run tests with `python -m pytest`
+- Run tests with `python -m pytest -q`
 - Run packaging smoke checks with `python -m build`
 
 Local troubleshooting guidance should stay aligned with these commands:
