@@ -17,6 +17,7 @@ src/video_link_pipeline.egg-info/requires.txt
 src/video_link_pipeline.egg-info/top_level.txt
 src/video_link_pipeline/download/__init__.py
 src/video_link_pipeline/download/cookies.py
+src/video_link_pipeline/download/diagnostics.py
 src/video_link_pipeline/download/selenium_fallback.py
 src/video_link_pipeline/download/service.py
 src/video_link_pipeline/download/yt_dlp_backend.py
@@ -30,3 +31,12 @@ src/video_link_pipeline/transcribe/faster_engine.py
 src/video_link_pipeline/transcribe/ffmpeg.py
 src/video_link_pipeline/transcribe/openai_engine.py
 src/video_link_pipeline/transcribe/service.py
+tests/test_cli_download_manifest.py
+tests/test_cli_run.py
+tests/test_cli_step_manifest.py
+tests/test_config.py
+tests/test_doctor.py
+tests/test_download_diagnostics.py
+tests/test_download_selenium.py
+tests/test_manifest.py
+tests/test_subtitles_convert.py
