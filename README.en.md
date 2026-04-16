@@ -404,7 +404,7 @@ When Selenium fallback is triggered during download, `execution.download` also c
 - `hint`: user-facing remediation advice, preferably aligned with doctor guidance and warning-code remediation
 - `fallback_status`: fallback lifecycle status, such as `triggered`, `dependency_missing`, `prepare_failed`, `retry_failed`, or `succeeded`
 - `warnings`: trigger reason, dependency hints, and context-preparation notes
-- `warning_details`: structured warning records with `code`, `message`, and `stage`, useful for batch analytics, for example `primary_http_403`, `browser_cookie_locked`, or `fallback_media_hint_missing`
+- `warning_details`: structured warning records with `code`, `message`, and `stage`, useful for batch analytics, for example `primary_http_403`, `browser_cookie_locked`, or `fallback_media_hint_missing_structured`
 - `fallback_context.resolved_url`: the final browser URL
 - `fallback_context.canonical_url`: the canonical page URL when available
 - `fallback_context.media_hint_url`: the preferred media URL extracted from page signals
@@ -420,7 +420,9 @@ Common `warning_details.code` values:
 - `browser_cookie_locked`: the browser cookies database is locked or could not be copied
 - `browser_driver_unavailable`: the Selenium browser driver is unavailable
 - `fallback_context_prepared`: fallback successfully extracted a usable browser context
-- `fallback_media_hint_missing`: no explicit media URL was extracted, so retry falls back to the page URL
+- `fallback_media_hint_missing_page_only`: the page exposed little or no structured media cue, so retry falls back to the page URL
+- `fallback_media_hint_missing_inline_only`: only inline script or raw HTML cues were detected, but no explicit media URL was extracted
+- `fallback_media_hint_missing_structured`: structured cues were detected, but they still did not expose an explicit media URL
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`: stage-specific fallback hints
 
 A typical download diagnostics fragment looks like this:
@@ -499,7 +501,9 @@ Suggested crosswalk for common codes:
 | `browser_driver_unavailable` | doctor active check / download manifest / doctor reference | Selenium extra or browser driver is unavailable | Install `video-link-pipeline[selenium]` and verify Chrome can launch |
 | `ffmpeg_unavailable` | doctor active check / doctor reference | FFmpeg is missing and media merge/transcode may fail | Install system ffmpeg or keep `imageio-ffmpeg` available |
 | `fallback_context_prepared` | download manifest / download CLI | Browser context was prepared successfully and retry can proceed | Inspect `fallback_context.*` fields to evaluate extraction quality |
-| `fallback_media_hint_missing` | download manifest / download CLI / doctor reference | No explicit media URL was extracted, so retry falls back to the page URL | Improve site signal extraction later; for now inspect `resolved_url` and `canonical_url` |
+| `fallback_media_hint_missing_page_only` | download manifest / download CLI / doctor reference | The page exposed little or no structured media cue, so retry falls back to the page URL | Improve page-level cue detection first; for now inspect `resolved_url` and `canonical_url` |
+| `fallback_media_hint_missing_inline_only` | download manifest / download CLI / doctor reference | Only inline script or raw HTML cues were detected, without a direct media URL | Improve deeper inline-state parsing |
+| `fallback_media_hint_missing_structured` | download manifest / download CLI / doctor reference | Structured cues were present, but no explicit media URL was extracted | Improve site-specific state-field extraction |
 | `fallback_dependency_hint` | download manifest / download CLI | Extra hint emitted when fallback dependencies are missing | Follow the emitted install hint |
 | `fallback_prepare_hint` | download manifest / download CLI | Extra hint emitted when fallback preparation failed | Inspect browser launch, cookies export, and page-signal extraction |
 | `fallback_retry_hint` | download manifest / download CLI | Extra hint emitted when fallback retry failed | Inspect retry headers, cookies, and media hint quality |

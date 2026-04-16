@@ -14,6 +14,9 @@ WARNING_CODES = {
     "ffmpeg_unavailable": "FFmpeg is unavailable and media merge or conversion may fail.",
     "fallback_context_prepared": "Selenium fallback prepared a usable browser context.",
     "fallback_media_hint_missing": "No explicit media URL was extracted, so retry falls back to the page URL.",
+    "fallback_media_hint_missing_page_only": "No structured page cue exposed a media URL, so retry falls back to the resolved page URL.",
+    "fallback_media_hint_missing_inline_only": "Only inline script or raw HTML cues were detected, but no explicit media URL was extracted.",
+    "fallback_media_hint_missing_structured": "Structured page cues were detected, but they still did not expose an explicit media URL.",
     "fallback_dependency_hint": "Additional hint emitted when fallback dependencies are missing.",
     "fallback_prepare_hint": "Additional hint emitted when fallback browser-context preparation fails.",
     "fallback_retry_hint": "Additional hint emitted when fallback retry fails.",
@@ -43,6 +46,15 @@ WARNING_REMEDIATIONS = {
     ),
     "fallback_media_hint_missing": (
         "The page did not expose a direct media URL. Retrying with the resolved page URL may still work, but site-specific extraction may need to be improved."
+    ),
+    "fallback_media_hint_missing_page_only": (
+        "The page exposed no structured media cue. Retrying with the resolved page URL may still work, but this site likely needs stronger page-signal extraction."
+    ),
+    "fallback_media_hint_missing_inline_only": (
+        "Only inline script or raw HTML cues were detected. The page may still require deeper state parsing before a direct media URL can be extracted."
+    ),
+    "fallback_media_hint_missing_structured": (
+        "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic."
     ),
 }
 

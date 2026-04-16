@@ -404,7 +404,7 @@ output/
 - `hint`：面向用户的可执行修复建议，优先复用 doctor/诊断码里的 remediation 文案
 - `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
 - `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
-- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing`
+- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing_structured`
 - `fallback_context.resolved_url`：浏览器最终停留地址
 - `fallback_context.canonical_url`：页面 canonical 或等价主地址
 - `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
@@ -420,7 +420,9 @@ output/
 - `browser_cookie_locked`：浏览器 cookies 数据库被占用、锁定或无法复制
 - `browser_driver_unavailable`：Selenium 浏览器驱动不可用
 - `fallback_context_prepared`：fallback 已成功提取浏览器上下文
-- `fallback_media_hint_missing`：未提取到明确媒体地址，只能用页面地址重试
+- `fallback_media_hint_missing_page_only`：页面里几乎没有可用结构化线索，只能用页面地址重试
+- `fallback_media_hint_missing_inline_only`：只命中了 inline script / raw HTML 线索，但还没抽到明确媒体地址
+- `fallback_media_hint_missing_structured`：命中了 meta / JSON-LD / 页面状态等结构化线索，但仍未抽到明确媒体地址
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
 
 一个典型的下载诊断片段示例如下：
@@ -499,7 +501,9 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 | `browser_driver_unavailable` | doctor 当前检查 / download manifest / doctor 参考 | Selenium extra 或浏览器驱动不可用 | 安装 `video-link-pipeline[selenium]`，确认 Chrome 可正常启动 |
 | `ffmpeg_unavailable` | doctor 当前检查 / doctor 参考 | FFmpeg 缺失，可能影响合并、转码、抽音频 | 安装系统 ffmpeg，或保留 `imageio-ffmpeg` |
 | `fallback_context_prepared` | download manifest / download CLI | 浏览器上下文已成功准备，可进入重试 | 重点查看 `fallback_context.*` 字段判断提取质量 |
-| `fallback_media_hint_missing` | download manifest / download CLI / doctor 参考 | 没有抽到明确媒体地址，只能退回页面地址重试 | 后续优先补站点线索提取；当前可先看 `resolved_url`/`canonical_url` |
+| `fallback_media_hint_missing_page_only` | download manifest / download CLI / doctor 参考 | 页面几乎没有结构化媒体线索，只能退回页面地址重试 | 优先补页面 cue 检测；当前先看 `resolved_url`/`canonical_url` |
+| `fallback_media_hint_missing_inline_only` | download manifest / download CLI / doctor 参考 | 只有 inline script / raw HTML 线索，没有抽到直接媒体地址 | 优先补更深的内联状态脚本解析 |
+| `fallback_media_hint_missing_structured` | download manifest / download CLI / doctor 参考 | 已命中结构化线索，但仍未抽到明确媒体地址 | 优先补站点特定状态字段提取逻辑 |
 | `fallback_dependency_hint` | download manifest / download CLI | fallback 依赖缺失时的补充提示 | 按 hint 安装依赖 |
 | `fallback_prepare_hint` | download manifest / download CLI | fallback 准备阶段失败时的补充提示 | 看浏览器启动、cookies 导出、页面线索提取链路 |
 | `fallback_retry_hint` | download manifest / download CLI | fallback 重试阶段失败时的补充提示 | 看 headers/cookies/media hint 是否正确 |

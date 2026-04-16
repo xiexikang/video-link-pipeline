@@ -425,6 +425,9 @@ Representative warning codes include:
 - `ffmpeg_unavailable`
 - `fallback_context_prepared`
 - `fallback_media_hint_missing`
+- `fallback_media_hint_missing_page_only`
+- `fallback_media_hint_missing_inline_only`
+- `fallback_media_hint_missing_structured`
 - `fallback_dependency_hint`
 - `fallback_prepare_hint`
 - `fallback_retry_hint`
@@ -460,8 +463,9 @@ diagnostics, manifests, and future refactors can evolve without reworking the wh
    and returns the success result when no anti-crawling or download failure is encountered.
 2. `fallback prepare`
    Runs Selenium only after a qualifying failure, exports browser cookies, resolves the browser-derived retry URL,
-   captures `fallback_context`, and emits preparation warnings such as `fallback_context_prepared` or
-   `fallback_media_hint_missing`.
+   captures `fallback_context`, and emits preparation warnings such as `fallback_context_prepared`,
+   `fallback_media_hint_missing_page_only`, `fallback_media_hint_missing_inline_only`, or
+   `fallback_media_hint_missing_structured`.
 3. `fallback retry`
    Re-runs `yt-dlp` with browser-derived headers and cookie state, then records either `succeeded`,
    `retry_failed`, or a more specific dependency / prepare failure state when retry cannot proceed.
