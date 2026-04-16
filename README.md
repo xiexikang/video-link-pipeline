@@ -144,7 +144,7 @@ python -m pytest -q
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-最近一次本地基线结果为 `100 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
+最近一次本地基线结果为 `107 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
 
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 
@@ -425,7 +425,7 @@ output/
 - `fallback_media_hint_missing_structured`：命中了 meta / JSON-LD / 页面状态等结构化线索，但仍未抽到明确媒体地址
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
 
-一个典型的下载诊断片段示例如下：
+一个更接近当前 fallback 排查场景的下载诊断片段示例如下：
 
 ```json
 {
@@ -433,13 +433,14 @@ output/
     "download": {
       "success": false,
       "used_selenium_fallback": false,
-      "fallback_status": "dependency_missing",
-      "error_code": "DEPENDENCY_MISSING",
-      "error": "selenium fallback requested but optional dependencies are not installed",
-      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
+      "fallback_status": "retry_failed",
+      "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+      "error": "retry download failed",
+      "hint": "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic.",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-        "install with: pip install \"video-link-pipeline[selenium]\""
+        "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+        "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL"
       ],
       "warning_details": [
         {
@@ -449,13 +450,26 @@ output/
           "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
         },
         {
-          "code": "fallback_dependency_hint",
-          "stage": "fallback_dependency",
-          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
-          "description": "Additional hint emitted when fallback dependencies are missing."
+          "code": "fallback_context_prepared",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+          "description": "Selenium fallback prepared a usable browser context."
+        },
+        {
+          "code": "fallback_media_hint_missing_structured",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+          "description": "Structured page cues were detected, but they still did not expose an explicit media URL."
         }
       ],
-      "fallback_context": null
+      "fallback_context": {
+        "resolved_url": "https://example.com/watch/demo",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://example.com/watch/demo",
+        "site_name": "example.com",
+        "extraction_source": "window.__DATA__:playAddr",
+        "extraction_kind": "window_state"
+      }
     }
   }
 }
@@ -465,7 +479,7 @@ output/
 
 - `fallback_status = "prepared"` 或 `"succeeded"`
 - `warning_details.code` 里出现 `fallback_context_prepared`
-- `fallback_context.media_hint_url`、`fallback_context.extraction_source` 可用于后续分析站点提取质量
+- `fallback_context.media_hint_url`、`fallback_context.extraction_source`、`fallback_context.extraction_kind` 可用于后续分析站点提取质量
 
 CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `manifest.json`、`vlp doctor` 对照：
 
