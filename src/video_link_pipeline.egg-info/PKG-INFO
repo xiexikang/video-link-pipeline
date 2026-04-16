@@ -48,6 +48,7 @@ Dynamic: license-file
 ## 当前能力
 
 - `vlp download <url>`：下载视频、音频、字幕，并标准化输出目录
+- `vlp download-subs <url>`：只下载字幕和元数据，默认抓取所有字幕语言，适合 B 站这类“字幕可拿但视频格式受限”的场景
 - `vlp transcribe <path>`：对视频或音频做 Whisper 转录，生成 `transcript.txt`、`subtitle_whisper.srt`、`subtitle_whisper.vtt`
 - `vlp summarize <transcript.txt>`：调用大模型生成 `summary.md` 和 `keywords.json`
 - `vlp convert-subtitle <file-or-dir>`：在 `srt` 和 `vtt` 之间转换
@@ -146,6 +147,46 @@ vlp doctor
 ```
 
 ## 本地开发验证
+
+如果你在本地参与开发，推荐优先在仓库内使用 `.venv` 虚拟环境，而不是直接污染全局 Python。
+
+Windows / PowerShell 下推荐命令：
+
+```powershell
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .[dev]
+```
+
+如果你当前机器上暂时不适合完整安装 `.[dev]`，也可以先安装“最小可用测试环境”：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pip install pytest ruff build PyYAML python-dotenv typer requests yt-dlp imageio-ffmpeg anthropic openai tqdm
+& .\.venv\Scripts\python.exe -m pip install -e . --no-deps
+```
+
+后续命令也建议显式使用 `.venv` 里的解释器，例如：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+& .\.venv\Scripts\python.exe -m ruff check .
+& .\.venv\Scripts\python.exe -m build
+```
+
+如果你已经激活了虚拟环境，再使用短命令也可以：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pytest -q
+```
+
+当前仓库已经在仓库内 `.venv` 环境下跑通过一轮全量测试基线：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+```
+
+最近一次本地基线结果为 `109 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
 
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 
@@ -329,12 +370,19 @@ VLP_SUMMARY_PROVIDER=claude
 ### 下载
 
 ```bash
+# 常规下载视频/音频/字幕
 vlp download "https://www.bilibili.com/video/BV..."
 vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
 vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+
+# 只下载字幕，适合 B 站这类字幕可拿但视频格式可能受限的站点
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+
+# 如果你还没有把项目安装成全局命令，也可以直接在仓库里运行
+python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
 
 ### 转录
@@ -405,12 +453,13 @@ output/
 - `hint`：面向用户的可执行修复建议，优先复用 doctor/诊断码里的 remediation 文案
 - `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
 - `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
-- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing`
+- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing_structured`
 - `fallback_context.resolved_url`：浏览器最终停留地址
 - `fallback_context.canonical_url`：页面 canonical 或等价主地址
 - `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
 - `fallback_context.site_name`：识别出的站点名称
-- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`
+- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`、`window.__INITIAL_STATE__:playAddr`、`meta:itemprop:contentUrl`
+- `fallback_context.extraction_kind`：对 `extraction_source` 的稳定归类，例如 `meta`、`jsonld`、`next_data`、`window_state`、`inline_html`
 
 常见 `warning_details.code` 对照：
 
@@ -420,10 +469,12 @@ output/
 - `browser_cookie_locked`：浏览器 cookies 数据库被占用、锁定或无法复制
 - `browser_driver_unavailable`：Selenium 浏览器驱动不可用
 - `fallback_context_prepared`：fallback 已成功提取浏览器上下文
-- `fallback_media_hint_missing`：未提取到明确媒体地址，只能用页面地址重试
+- `fallback_media_hint_missing_page_only`：页面里几乎没有可用结构化线索，只能用页面地址重试
+- `fallback_media_hint_missing_inline_only`：只命中了 inline script / raw HTML 线索，但还没抽到明确媒体地址
+- `fallback_media_hint_missing_structured`：命中了 meta / JSON-LD / 页面状态等结构化线索，但仍未抽到明确媒体地址
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
 
-一个典型的下载诊断片段示例如下：
+一个更接近当前 fallback 排查场景的下载诊断片段示例如下：
 
 ```json
 {
@@ -431,13 +482,14 @@ output/
     "download": {
       "success": false,
       "used_selenium_fallback": false,
-      "fallback_status": "dependency_missing",
-      "error_code": "DEPENDENCY_MISSING",
-      "error": "selenium fallback requested but optional dependencies are not installed",
-      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
+      "fallback_status": "retry_failed",
+      "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+      "error": "retry download failed",
+      "hint": "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic.",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-        "install with: pip install \"video-link-pipeline[selenium]\""
+        "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+        "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL"
       ],
       "warning_details": [
         {
@@ -447,13 +499,26 @@ output/
           "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
         },
         {
-          "code": "fallback_dependency_hint",
-          "stage": "fallback_dependency",
-          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
-          "description": "Additional hint emitted when fallback dependencies are missing."
+          "code": "fallback_context_prepared",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+          "description": "Selenium fallback prepared a usable browser context."
+        },
+        {
+          "code": "fallback_media_hint_missing_structured",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+          "description": "Structured page cues were detected, but they still did not expose an explicit media URL."
         }
       ],
-      "fallback_context": null
+      "fallback_context": {
+        "resolved_url": "https://example.com/watch/demo",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://example.com/watch/demo",
+        "site_name": "example.com",
+        "extraction_source": "window.__DATA__:playAddr",
+        "extraction_kind": "window_state"
+      }
     }
   }
 }
@@ -463,7 +528,7 @@ output/
 
 - `fallback_status = "prepared"` 或 `"succeeded"`
 - `warning_details.code` 里出现 `fallback_context_prepared`
-- `fallback_context.media_hint_url`、`fallback_context.extraction_source` 可用于后续分析站点提取质量
+- `fallback_context.media_hint_url`、`fallback_context.extraction_source`、`fallback_context.extraction_kind` 可用于后续分析站点提取质量
 
 CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `manifest.json`、`vlp doctor` 对照：
 
@@ -473,6 +538,7 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 - `download hint=...`
 - `download warning_code=<code> stage=<stage>: ...`
 - `download fallback_context.extraction_source=...`
+- `download fallback_context.extraction_kind=...`
 - `download fallback_context.media_hint_url=...`
 - `download fallback_context.canonical_url=...`
 - `download fallback_context.resolved_url=...`
@@ -498,10 +564,20 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 | `browser_driver_unavailable` | doctor 当前检查 / download manifest / doctor 参考 | Selenium extra 或浏览器驱动不可用 | 安装 `video-link-pipeline[selenium]`，确认 Chrome 可正常启动 |
 | `ffmpeg_unavailable` | doctor 当前检查 / doctor 参考 | FFmpeg 缺失，可能影响合并、转码、抽音频 | 安装系统 ffmpeg，或保留 `imageio-ffmpeg` |
 | `fallback_context_prepared` | download manifest / download CLI | 浏览器上下文已成功准备，可进入重试 | 重点查看 `fallback_context.*` 字段判断提取质量 |
-| `fallback_media_hint_missing` | download manifest / download CLI / doctor 参考 | 没有抽到明确媒体地址，只能退回页面地址重试 | 后续优先补站点线索提取；当前可先看 `resolved_url`/`canonical_url` |
+| `fallback_media_hint_missing_page_only` | download manifest / download CLI / doctor 参考 | 页面几乎没有结构化媒体线索，只能退回页面地址重试 | 优先补页面 cue 检测；当前先看 `resolved_url`/`canonical_url` |
+| `fallback_media_hint_missing_inline_only` | download manifest / download CLI / doctor 参考 | 只有 inline script / raw HTML 线索，没有抽到直接媒体地址 | 优先补更深的内联状态脚本解析 |
+| `fallback_media_hint_missing_structured` | download manifest / download CLI / doctor 参考 | 已命中结构化线索，但仍未抽到明确媒体地址 | 优先补站点特定状态字段提取逻辑 |
 | `fallback_dependency_hint` | download manifest / download CLI | fallback 依赖缺失时的补充提示 | 按 hint 安装依赖 |
 | `fallback_prepare_hint` | download manifest / download CLI | fallback 准备阶段失败时的补充提示 | 看浏览器启动、cookies 导出、页面线索提取链路 |
 | `fallback_retry_hint` | download manifest / download CLI | fallback 重试阶段失败时的补充提示 | 看 headers/cookies/media hint 是否正确 |
+
+如果你是在补站点适配，看到这几个 code 时，通常可以按下面的顺序排查：
+
+- `fallback_media_hint_missing_page_only`：先补页面级 cue 检测，例如更稳的 `video/source`、`og:*`、`twitter:*`、`canonical`、短视频页专用 DOM 标记。
+- `fallback_media_hint_missing_inline_only`：优先补 inline script / `JSON.parse(...)` / 无 `window.` 前缀状态赋值 / 特定站点脚本片段解析。
+- `fallback_media_hint_missing_structured`：说明已经命中了 `meta`、`JSON-LD`、`__NEXT_DATA__`、`window.__DATA__` 这类结构化入口，下一步应重点补字段映射，例如 `playAddr`、`dash.url`、`streamUrl`、`contentUrl`、`m3u8`。
+- 如果 `fallback_context.extraction_kind` 是 `window_state` 但仍是 `fallback_media_hint_missing_structured`，通常优先补状态对象里的字段遍历或嵌套路径覆盖。
+- 如果 `fallback_context.extraction_kind` 是 `inline_html` 或 `inline_script`，但没有升级到结构化 source，说明当前更多只是 URL 正则兜底，后续应尽量把它提升成稳定状态解析。
 
 当前下载实现内部也已经按阶段收口为三段，便于长期维护：
 
@@ -516,8 +592,26 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 - `vlp summarize` 失败时，只要已经产出摘要目录与 `summary.md` 路径，仍会先写出 `manifest.json`，再由 CLI 抛错
 - `execution.download.error_code` 在下载失败但结果里未显式提供错误码时，会稳定回落成 `DOWNLOAD_FAILED`
 - `vlp run` 仅执行下载成功时，最终 `manifest.json` 会保留完整的 `execution.download` 诊断字段，不会凭空补出 `transcribe` 或 `summarize`
+- `vlp run` 如果发现 job 目录里已经存在 `transcript.txt`，会直接复用已有转录结果，并在 `execution.transcribe.reused_existing=true` 下记录这次跳过行为
+- `vlp run --do-summary` 如果发现 job 目录里已经存在 `summary.md`，会直接复用已有摘要结果，并在 `execution.summarize.reused_existing=true` 下记录这次跳过行为
 - `vlp run` 在转录失败时，manifest 会保留下载成功结果，并以最近一次写入命令 `vlp transcribe` 结束，方便定位失败阶段
 - `vlp run` 在摘要失败时，manifest 会同时保留下载成功、转录成功和摘要失败状态，并以最近一次写入命令 `vlp summarize` 结束
+
+当 `vlp run` 复用已有 transcript 时，常见补全字段包括：
+
+- `artifacts.transcript_txt`
+- `artifacts.subtitle_srt` / `artifacts.subtitle_vtt` / `artifacts.transcript_json`（如果这些文件已存在）
+- `execution.transcribe.success = true`
+- `execution.transcribe.reused_existing = true`
+- `execution.transcribe.warnings = ["reused existing transcript"]`
+
+当 `vlp run` 复用已有 summary 时，常见补全字段包括：
+
+- `artifacts.summary_md`
+- `artifacts.keywords_json`（如果该文件已存在）
+- `execution.summarize.success = true`
+- `execution.summarize.reused_existing = true`
+- `execution.summarize.warnings = ["reused existing summary"]`
 
 ## 兼容脚本
 

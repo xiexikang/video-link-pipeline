@@ -37,7 +37,9 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
             "needs_whisper": False,
             "used_selenium_fallback": True,
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:05Z",
+            "finished_at_local": "2026-04-16T18:00:05+08:00",
             "elapsed_ms": 5000,
             "error_code": None,
             "error_stage": None,
@@ -76,6 +78,8 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
     assert result.exit_code == 0, result.stdout
     manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
     download_execution = manifest["execution"]["download"]
+    assert "created_at_local" in manifest
+    assert "updated_at_local" in manifest
     assert manifest["media"]["duration_seconds"] == 95.0
     assert manifest["media"]["duration_human"] == "1:35"
     assert download_execution["used_selenium_fallback"] is True
@@ -83,7 +87,9 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
     assert download_execution["hint"] is None
     assert download_execution["fallback_status"] == "succeeded"
     assert download_execution["started_at"] == "2026-04-16T10:00:00Z"
+    assert download_execution["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert download_execution["finished_at"] == "2026-04-16T10:00:05Z"
+    assert download_execution["finished_at_local"] == "2026-04-16T18:00:05+08:00"
     assert download_execution["elapsed_ms"] == 5000
     assert download_execution["warning_details"][0]["code"] == "primary_http_403"
     assert download_execution["warning_details"][1]["code"] == "fallback_context_prepared"
@@ -240,7 +246,9 @@ def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_pa
             "needs_whisper": False,
             "used_selenium_fallback": True,
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:07Z",
+            "finished_at_local": "2026-04-16T18:00:07+08:00",
             "elapsed_ms": 7000,
             "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
             "error_stage": "fallback_retry",
@@ -291,7 +299,9 @@ def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_pa
     assert download_execution["hint"] == "Install the Selenium extra and verify the browser driver can start normally."
     assert download_execution["fallback_status"] == "retry_failed"
     assert download_execution["started_at"] == "2026-04-16T10:00:00Z"
+    assert download_execution["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert download_execution["finished_at"] == "2026-04-16T10:00:07Z"
+    assert download_execution["finished_at_local"] == "2026-04-16T18:00:07+08:00"
     assert download_execution["elapsed_ms"] == 7000
     assert download_execution["warning_details"][0]["code"] == "primary_http_403"
     assert download_execution["warning_details"][1]["code"] == "fallback_retry_hint"
@@ -383,7 +393,9 @@ def test_download_subs_command_records_subtitle_only_manifest(monkeypatch, tmp_p
             "needs_whisper": False,
             "used_selenium_fallback": False,
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:03Z",
+            "finished_at_local": "2026-04-16T18:00:03+08:00",
             "elapsed_ms": 3000,
             "error_code": None,
             "error_stage": None,
@@ -411,5 +423,7 @@ def test_download_subs_command_records_subtitle_only_manifest(monkeypatch, tmp_p
     assert manifest["media"]["duration_human"] == "0:42"
     assert manifest["artifacts"]["subtitle_srt"] == "video-subs-demo/subtitle.srt"
     assert manifest["config_effective"]["download"]["subtitle_only"] is True
+    assert manifest["execution"]["download"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
+    assert manifest["execution"]["download"]["finished_at_local"] == "2026-04-16T18:00:03+08:00"
     assert manifest["execution"]["download"]["elapsed_ms"] == 3000
     assert "subtitle download completed" in result.stdout

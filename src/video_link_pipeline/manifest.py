@@ -36,7 +36,9 @@ def create_manifest(
     data = {
         "schema_version": SCHEMA_VERSION,
         "created_at": timestamp,
+        "created_at_local": _local_now(),
         "updated_at": timestamp,
+        "updated_at_local": _local_now(),
         "command": command,
         "input": input_data or {"url": None, "input_path": None},
         "config_effective": config_effective or {},
@@ -78,7 +80,9 @@ def merge_manifest(manifest: Manifest, patch: dict[str, Any]) -> Manifest:
     merged = _deep_merge_dicts(manifest.data, patch)
     merged.setdefault("schema_version", SCHEMA_VERSION)
     merged.setdefault("created_at", _utc_now())
+    merged.setdefault("created_at_local", _local_now())
     merged["updated_at"] = _utc_now()
+    merged["updated_at_local"] = _local_now()
     return Manifest(path=manifest.path, data=merged)
 
 
@@ -172,3 +176,7 @@ def _deep_merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[st
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _local_now() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()

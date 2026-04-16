@@ -25,6 +25,8 @@ def test_upsert_manifest_merges_incremental_sections(tmp_path: Path) -> None:
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload["command"] == "vlp transcribe"
+    assert "created_at_local" in payload
+    assert "updated_at_local" in payload
     assert payload["artifacts"]["video"] == "job/video.mp4"
     assert payload["artifacts"]["transcript_txt"] == "job/transcript.txt"
     assert payload["execution"]["download"]["success"] is True
@@ -47,6 +49,8 @@ def test_write_manifest_is_atomic_and_replaces_existing_file(tmp_path: Path) -> 
     assert written_path == manifest_path
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload["command"] == "vlp doctor"
+    assert "created_at_local" in payload
+    assert "updated_at_local" in payload
     assert payload["artifacts"]["report"] == "doctor.txt"
     assert "stale" not in payload
     assert list(tmp_path.glob(".manifest.*.tmp")) == []
