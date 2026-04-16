@@ -1099,3 +1099,57 @@ def test_extract_page_signals_from_html_reads_inline_data_json_parse() -> None:
 
     assert signals["media_hint_url"] == "https://cdn.example.com/from-json-parse.m3u8"
     assert signals["extraction_source"] == "window.__DATA__:playAddr"
+
+
+def test_extract_page_signals_from_html_reads_state_assignment_without_window_prefix() -> None:
+    html = """
+    <html>
+      <head>
+        <script>
+          __STATE__ = {
+            "detail": {
+              "video": {
+                "contentUrl": "https://cdn.example.com/from-state.mp4"
+              }
+            }
+          };
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/state",
+        canonical_url="https://example.com/watch/state",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-state.mp4"
+    assert signals["extraction_source"] == "window.__STATE__:contentUrl"
+
+
+def test_extract_page_signals_from_html_reads_json_parse_with_single_quotes() -> None:
+    html = r"""
+    <html>
+      <head>
+        <script>
+          __APP_DATA__ = JSON.parse('{"detail":{"video":{"dash":{"url":"https://cdn.example.com/from-single-quote.mpd"}}}}')
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/app-data",
+        canonical_url="https://example.com/watch/app-data",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-single-quote.mpd"
+    assert signals["extraction_source"] == "window.__APP_DATA__:dash:url"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import importlib.util
 import re
@@ -192,6 +193,12 @@ def _wait_for_media_signals(driver: object) -> None:
                     const ogUrl = document.querySelector('meta[property="og:url"], link[rel="canonical"]');
                     const nextData = document.querySelector('#__NEXT_DATA__');
                     const jsonLd = document.querySelector('script[type="application/ld+json"]');
+                    const inlineScripts = Array.from(document.scripts || []).slice(0, 20);
+                    const inlineStateSignal = inlineScripts.some(script => {
+                      const text = String(script.textContent || '');
+                      if (!text) return false;
+                      return /__INITIAL_STATE__|__NUXT__|__NEXT_DATA__|__INITIAL_PROPS__|__APP_DATA__|__DATA__|__STATE__|playAddr|m3u8|mpd|dash/i.test(text);
+                    });
                     const globals =
                       window.__INITIAL_STATE__ ||
                       window.__NUXT__ ||
@@ -201,7 +208,7 @@ def _wait_for_media_signals(driver: object) -> None:
                       window.__DATA__ ||
                       window.__STATE__ ||
                       window._ROUTER_DATA;
-                    return video || ogVideo || contentUrl || twitterPlayer || ogUrl || nextData || jsonLd || globals;
+                    return video || ogVideo || contentUrl || twitterPlayer || ogUrl || nextData || jsonLd || globals || inlineStateSignal;
                     """
                 )
             )
@@ -226,6 +233,15 @@ def _extract_page_signals(driver: object) -> dict[str, str]:
               if (!normalized) return;
               mediaCandidates.push({ url: normalized, source });
             };
+            const inlineStateSources = [
+              '__INITIAL_STATE__',
+              '__NUXT__',
+              '__NEXT_DATA__',
+              '__INITIAL_PROPS__',
+              '__APP_DATA__',
+              '__DATA__',
+              '__STATE__'
+            ];
             const pickFromObject = (input, source, depth = 0) => {
               if (!input || depth > 5) return;
               if (Array.isArray(input)) {
@@ -253,6 +269,26 @@ def _extract_page_signals(driver: object) -> dict[str, str]:
                   pickFromObject(value, source, depth + 1);
                 }
               });
+            };
+            const pickFromInlineScriptText = (text) => {
+              if (!text) return;
+
+              for (const stateName of inlineStateSources) {
+                const parsePattern = new RegExp(
+                  '(?:window\\\\.)?' + stateName + '\\\\s*=\\\\s*JSON\\\\.parse\\\\(\\\\s*([\"\\\'])((?:\\\\\\\\.|(?!\\\\1)[\\\\s\\\\S])*)\\\\1\\\\s*\\\\)',
+                  'i'
+                );
+                const parseMatch = text.match(parsePattern);
+                if (parseMatch) {
+                  try {
+                    const decoded = JSON.parse(parseMatch[1] + parseMatch[2] + parseMatch[1]);
+                    pickFromObject(JSON.parse(decoded), 'window.' + stateName);
+                  } catch (error) {}
+                }
+              }
+
+              const matches = text.match(/https?:[^"'\\s]+(?:m3u8|mp4|mpd)[^"'\\s]*/ig) || [];
+              matches.slice(0, 10).forEach(url => pushCandidate(url, 'inline-script'));
             };
             const videoNode = document.querySelector('video');
             const sourceNode = document.querySelector('video source[src], source[src]');
@@ -298,8 +334,7 @@ def _extract_page_signals(driver: object) -> dict[str, str]:
             for (const script of inlineScripts) {
               const text = String(script.textContent || '');
               if (!text) continue;
-              const matches = text.match(/https?:[^"'\\s]+(?:m3u8|mp4|mpd)[^"'\\s]*/ig) || [];
-              matches.slice(0, 10).forEach(url => pushCandidate(url, 'inline-script'));
+              pickFromInlineScriptText(text);
             }
 
             const preferredMedia =
@@ -502,9 +537,9 @@ def _parse_json_parse_expression(payload_text: str) -> object | None:
     body = str(match.group("body"))
     wrapped = f"{quote}{body}{quote}"
     try:
-        decoded = json.loads(wrapped)
+        decoded = ast.literal_eval(wrapped)
         return json.loads(decoded)
-    except json.JSONDecodeError:
+    except (ValueError, SyntaxError, json.JSONDecodeError):
         return None
 
 
