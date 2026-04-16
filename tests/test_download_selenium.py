@@ -991,3 +991,55 @@ def test_extract_page_signals_from_html_reads_jsonld_and_next_data() -> None:
 
     assert signals["media_hint_url"] == "https://cdn.example.com/from-next-data.m3u8"
     assert signals["extraction_source"] == "next-data:playAddr"
+
+
+def test_extract_page_signals_from_html_reads_inline_initial_state() -> None:
+    html = """
+    <html>
+      <head>
+        <script>
+          window.__INITIAL_STATE__ = {
+            "detail": {
+              "video": {
+                "playAddr": "https://cdn.example.com/from-initial-state.m3u8"
+              }
+            }
+          };
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/456",
+        canonical_url="https://example.com/watch/456",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-initial-state.m3u8"
+    assert signals["extraction_source"] == "window.__INITIAL_STATE__:playAddr"
+
+
+def test_extract_page_signals_from_html_reads_meta_content_url() -> None:
+    html = """
+    <html>
+      <head>
+        <meta itemprop="contentUrl" content="https://cdn.example.com/from-meta.mp4" />
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/789",
+        canonical_url="https://example.com/watch/789",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-meta.mp4"
+    assert signals["extraction_source"] == "meta:itemprop:contentUrl"
