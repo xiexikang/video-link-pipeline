@@ -331,6 +331,40 @@ def test_doctor_command_deduplicates_guidance_and_reference_codes(monkeypatch, t
     assert "ffmpeg_unavailable:" not in known_codes_section
 
 
+def test_doctor_command_omits_duplicate_per_check_hint_when_shared_fix_is_rendered(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "output_dir": str(tmp_path / "output"),
+                "summary": {"provider": "claude"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.cli.run_checks",
+        lambda _: [
+            __import__("video_link_pipeline.doctor", fromlist=["DoctorCheck"]).DoctorCheck(
+                name="cookies",
+                ok=False,
+                detail="browser cookie database is locked",
+                section="download_prerequisites",
+                code="browser_cookie_locked",
+                hint=warning_code_remediation("browser_cookie_locked"),
+            ),
+        ],
+    )
+
+    result = runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert "hint: Close the target browser completely" not in result.stdout
+    assert result.stdout.count("browser_cookie_locked fix:") == 1
+
+
 def test_doctor_reference_lines_include_common_codes_and_fixes() -> None:
     lines = doctor_reference_lines()
 
