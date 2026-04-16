@@ -341,6 +341,7 @@ def _prepare_retry_download(
     languages: list[str] | None,
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
     result: dict[str, object],
 ) -> DownloadPreparation:
     """Probe and prepare the fallback retry download request."""
@@ -351,6 +352,7 @@ def _prepare_retry_download(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         cookie_file=context.cookie_file,
     )
     preparation.output_dir.mkdir(parents=True, exist_ok=True)
@@ -468,11 +470,20 @@ def build_base_ydl_options(
     languages: list[str],
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
     ffmpeg_path: str | None,
     cookie_source: CookieSource,
 ) -> dict[str, Any]:
     """Build the baseline yt-dlp options shared by old and new entry points."""
-    if audio_only:
+    if subtitle_only:
+        options: dict[str, Any] = {
+            "skip_download": True,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": languages,
+            "subtitlesformat": "vtt/srt",
+        }
+    elif audio_only:
         options: dict[str, Any] = {
             "format": "bestaudio/best",
             "postprocessors": [
@@ -506,7 +517,7 @@ def build_base_ydl_options(
     )
     if ffmpeg_path:
         options["ffmpeg_location"] = ffmpeg_path
-    elif not audio_only:
+    elif not audio_only and not subtitle_only:
         options["format"] = "best[ext=mp4]/best"
         options.pop("merge_output_format", None)
     options.update(build_cookie_options(cookie_source))
@@ -521,6 +532,7 @@ def prepare_download(
     languages: list[str] | None = None,
     quality: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
     audio_only: bool = False,
+    subtitle_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
 ) -> DownloadPreparation:
@@ -542,6 +554,7 @@ def prepare_download(
         languages=normalized_languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         ffmpeg_path=ffmpeg_path,
         cookie_source=cookie_source,
     )
@@ -603,6 +616,7 @@ def probe_download(
     languages: list[str] | None = None,
     quality: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
     audio_only: bool = False,
+    subtitle_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
 ) -> DownloadPreparation:
@@ -614,6 +628,7 @@ def probe_download(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
     )
@@ -635,6 +650,7 @@ def probe_download(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
     ).__class__(
@@ -649,13 +665,14 @@ def probe_download(
             languages=languages or ["zh", "en"],
             quality=quality,
             audio_only=audio_only,
+            subtitle_only=subtitle_only,
             ffmpeg_path=probe_prep.ffmpeg_path,
             cookie_source=probe_prep.cookie_source,
         ),
     )
 
 
-def _validate_downloaded_files(job_dir: Path, *, audio_only: bool) -> None:
+def _validate_downloaded_files(job_dir: Path, *, audio_only: bool, subtitle_only: bool) -> None:
     files = list(job_dir.glob("*"))
     if not files:
         raise DownloadError("download failed: no files were created")
@@ -665,6 +682,12 @@ def _validate_downloaded_files(job_dir: Path, *, audio_only: bool) -> None:
         if any(path.exists() for path in audio_candidates):
             return
         raise DownloadError("download failed: no audio artifact was produced")
+
+    if subtitle_only:
+        subtitle_candidates = [job_dir / "subtitle.vtt", job_dir / "subtitle.srt"]
+        if any(path.exists() for path in subtitle_candidates):
+            return
+        raise DownloadError("download failed: no subtitle artifact was produced")
 
     video_file = job_dir / "video.mp4"
     if not video_file.exists():
@@ -697,9 +720,11 @@ def _populate_result_from_artifacts(
         result["subtitle_vtt"] = result["subtitle"]
     if artifacts["subtitle_srt"]:
         result["subtitle_srt"] = _relpath(artifacts["subtitle_srt"])
+        if not result.get("subtitle"):
+            result["subtitle"] = result["subtitle_srt"]
     if artifacts["info_json"]:
         result["info"] = _relpath(artifacts["info_json"])
-    if not audio_only and not result["subtitle"]:
+    if not audio_only and not result.get("subtitle") and not result.get("subtitle_srt"):
         result["needs_whisper"] = True
     result["success"] = True
     result["error_code"] = None
@@ -721,6 +746,7 @@ def _execute_primary_download(
     languages: list[str] | None,
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
     cookies_from_browser: str | None,
     cookie_file: str | Path | None,
     result: dict[str, object],
@@ -732,6 +758,7 @@ def _execute_primary_download(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
     )
@@ -739,7 +766,11 @@ def _execute_primary_download(
     _apply_preparation_metadata(result, preparation)
 
     artifacts = _execute_ydl_download(preparation)
-    _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
+    _validate_downloaded_files(
+        preparation.output_dir,
+        audio_only=audio_only,
+        subtitle_only=subtitle_only,
+    )
     return _populate_result_from_artifacts(
         result=result,
         artifacts=artifacts,
@@ -756,6 +787,7 @@ def _retry_with_selenium_context(
     languages: list[str] | None,
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
     result: dict[str, object],
 ) -> dict[str, object]:
     preparation = _prepare_retry_download(
@@ -764,12 +796,17 @@ def _retry_with_selenium_context(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
         result=result,
     )
     _record_retry_context_state(result, context)
 
     artifacts = _execute_ydl_download(preparation)
-    _validate_downloaded_files(preparation.output_dir, audio_only=audio_only)
+    _validate_downloaded_files(
+        preparation.output_dir,
+        audio_only=audio_only,
+        subtitle_only=subtitle_only,
+    )
     result["used_selenium_fallback"] = True
     result["fallback_status"] = "succeeded"
     return _populate_result_from_artifacts(
@@ -798,6 +835,7 @@ def _continue_after_primary_failure(
     languages: list[str] | None,
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
 ) -> dict[str, object]:
     """Continue from a normalized primary failure into optional fallback handling."""
     return _handle_download_failure(
@@ -807,6 +845,7 @@ def _continue_after_primary_failure(
         languages=languages,
         quality=quality,
         audio_only=audio_only,
+        subtitle_only=subtitle_only,
     )
 
 
@@ -817,6 +856,7 @@ def execute_download(
     languages: list[str] | None = None,
     quality: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
     audio_only: bool = False,
+    subtitle_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
     selenium_mode: str = "auto",
@@ -831,6 +871,7 @@ def execute_download(
             languages=languages,
             quality=quality,
             audio_only=audio_only,
+            subtitle_only=subtitle_only,
             cookies_from_browser=cookies_from_browser,
             cookie_file=cookie_file,
             result=result,
@@ -844,6 +885,7 @@ def execute_download(
             languages=languages,
             quality=quality,
             audio_only=audio_only,
+            subtitle_only=subtitle_only,
         )
 
 
@@ -855,6 +897,7 @@ def _handle_download_failure(
     languages: list[str] | None,
     quality: str,
     audio_only: bool,
+    subtitle_only: bool,
 ) -> dict[str, object]:
     error_message = str(result.get("error") or "download failed")
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
@@ -873,6 +916,7 @@ def _handle_download_failure(
             languages=languages,
             quality=quality,
             audio_only=audio_only,
+            subtitle_only=subtitle_only,
             result=result,
         )
     except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:

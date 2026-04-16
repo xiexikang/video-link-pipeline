@@ -7,6 +7,7 @@
 ## 当前能力
 
 - `vlp download <url>`：下载视频、音频、字幕，并标准化输出目录
+- `vlp download-subs <url>`：只下载字幕和元数据，默认抓取所有字幕语言，适合 B 站这类“字幕可拿但视频格式受限”的场景
 - `vlp transcribe <path>`：对视频或音频做 Whisper 转录，生成 `transcript.txt`、`subtitle_whisper.srt`、`subtitle_whisper.vtt`
 - `vlp summarize <transcript.txt>`：调用大模型生成 `summary.md` 和 `keywords.json`
 - `vlp convert-subtitle <file-or-dir>`：在 `srt` 和 `vtt` 之间转换
@@ -328,12 +329,19 @@ VLP_SUMMARY_PROVIDER=claude
 ### 下载
 
 ```bash
+# 常规下载视频/音频/字幕
 vlp download "https://www.bilibili.com/video/BV..."
 vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
 vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+
+# 只下载字幕，适合 B 站这类字幕可拿但视频格式可能受限的站点
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+
+# 如果你还没有把项目安装成全局命令，也可以直接在仓库里运行
+python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
 
 ### 转录
