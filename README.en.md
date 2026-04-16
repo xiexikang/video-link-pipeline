@@ -144,7 +144,7 @@ The repository has already been validated once against a full local pytest basel
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The latest local baseline result was `100 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
+The latest local baseline result was `107 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
 
 If you are contributing locally, install the dev extra:
 
@@ -425,7 +425,7 @@ Common `warning_details.code` values:
 - `fallback_media_hint_missing_structured`: structured cues were detected, but they still did not expose an explicit media URL
 - `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`: stage-specific fallback hints
 
-A typical download diagnostics fragment looks like this:
+A more representative download diagnostics fragment for current fallback triage looks like this:
 
 ```json
 {
@@ -433,13 +433,14 @@ A typical download diagnostics fragment looks like this:
     "download": {
       "success": false,
       "used_selenium_fallback": false,
-      "fallback_status": "dependency_missing",
-      "error_code": "DEPENDENCY_MISSING",
-      "error": "selenium fallback requested but optional dependencies are not installed",
-      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
+      "fallback_status": "retry_failed",
+      "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+      "error": "retry download failed",
+      "hint": "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic.",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-        "install with: pip install \"video-link-pipeline[selenium]\""
+        "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+        "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL"
       ],
       "warning_details": [
         {
@@ -449,13 +450,26 @@ A typical download diagnostics fragment looks like this:
           "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
         },
         {
-          "code": "fallback_dependency_hint",
-          "stage": "fallback_dependency",
-          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
-          "description": "Additional hint emitted when fallback dependencies are missing."
+          "code": "fallback_context_prepared",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+          "description": "Selenium fallback prepared a usable browser context."
+        },
+        {
+          "code": "fallback_media_hint_missing_structured",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+          "description": "Structured page cues were detected, but they still did not expose an explicit media URL."
         }
       ],
-      "fallback_context": null
+      "fallback_context": {
+        "resolved_url": "https://example.com/watch/demo",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://example.com/watch/demo",
+        "site_name": "example.com",
+        "extraction_source": "window.__DATA__:playAddr",
+        "extraction_kind": "window_state"
+      }
     }
   }
 }
@@ -465,7 +479,7 @@ If fallback successfully prepares a browser context, the common signals become:
 
 - `fallback_status = "prepared"` or `"succeeded"`
 - `warning_details.code` contains `fallback_context_prepared`
-- `fallback_context.media_hint_url` and `fallback_context.extraction_source` can be used to analyze extractor quality per site
+- `fallback_context.media_hint_url`, `fallback_context.extraction_source`, and `fallback_context.extraction_kind` can be used to analyze extractor quality per site
 
 The CLI download diagnostics now mirrors the same field names where practical so console output lines up with `manifest.json` and `vlp doctor` terminology:
 

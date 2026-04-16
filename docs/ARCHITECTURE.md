@@ -341,13 +341,14 @@ Example:
     "download": {
       "success": false,
       "used_selenium_fallback": false,
-      "fallback_status": "dependency_missing",
-      "error_code": "DEPENDENCY_MISSING",
-      "error": "selenium fallback requested but optional dependencies are not installed",
-      "hint": "install with: pip install 'video-link-pipeline[selenium]'",
+      "fallback_status": "retry_failed",
+      "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+      "error": "retry download failed",
+      "hint": "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic.",
       "warnings": [
         "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-        "install with: pip install \"video-link-pipeline[selenium]\""
+        "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+        "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL"
       ],
       "warning_details": [
         {
@@ -357,13 +358,26 @@ Example:
           "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
         },
         {
-          "code": "fallback_dependency_hint",
-          "stage": "fallback_dependency",
-          "message": "install with: pip install \"video-link-pipeline[selenium]\"",
-          "description": "Additional hint emitted when fallback dependencies are missing."
+          "code": "fallback_context_prepared",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+          "description": "Selenium fallback prepared a usable browser context."
+        },
+        {
+          "code": "fallback_media_hint_missing_structured",
+          "stage": "fallback_prepare",
+          "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+          "description": "Structured page cues were detected, but they still did not expose an explicit media URL."
         }
       ],
-      "fallback_context": null
+      "fallback_context": {
+        "resolved_url": "https://example.com/watch/demo",
+        "canonical_url": "https://example.com/watch/demo",
+        "media_hint_url": "https://example.com/watch/demo",
+        "site_name": "example.com",
+        "extraction_source": "window.__DATA__:playAddr",
+        "extraction_kind": "window_state"
+      }
     },
     "transcribe": {
       "success": true,
