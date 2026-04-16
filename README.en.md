@@ -138,6 +138,14 @@ If the virtual environment is already activated, the shorter form is also fine:
 python -m pytest -q
 ```
 
+The repository has already been validated once against a full local pytest baseline inside the repository-local `.venv`:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+```
+
+The latest local baseline result was `93 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
+
 If you are contributing locally, install the dev extra:
 
 ```bash
