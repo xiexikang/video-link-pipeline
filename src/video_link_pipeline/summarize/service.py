@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from ..errors import ConfigError, InputNotFoundError, VlpError
@@ -29,6 +31,16 @@ class SummarizeError(VlpError):
 
     def __init__(self, message: str, hint: str | None = None) -> None:
         super().__init__(message=message, error_code="SUMMARY_FAILED", hint=hint)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _finalize_timing(result: dict[str, object], *, started_at: str, started_perf: float) -> None:
+    result["started_at"] = started_at
+    result["finished_at"] = _utc_now()
+    result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
 
 
 def load_transcript(transcript_path: str | Path) -> str:
@@ -80,6 +92,8 @@ def summarize_transcript(
     output_dir: str | Path | None,
     config: dict[str, Any],
 ) -> dict[str, object]:
+    started_at = _utc_now()
+    started_perf = perf_counter()
     transcript = load_transcript(transcript_path)
     transcript_file = Path(transcript_path)
     target_output_dir = Path(output_dir) if output_dir else transcript_file.parent
@@ -107,6 +121,9 @@ def summarize_transcript(
         "confidence": 0.0,
         "raw_response": "",
         "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "elapsed_ms": None,
     }
 
     try:
@@ -179,3 +196,5 @@ def summarize_transcript(
     except Exception as exc:
         result["error"] = str(exc)
         return result
+    finally:
+        _finalize_timing(result, started_at=started_at, started_perf=started_perf)

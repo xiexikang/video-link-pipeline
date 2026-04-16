@@ -46,6 +46,9 @@ def test_transcribe_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -
             "detected_language": None,
             "engine": "faster",
             "error": "ffmpeg decode failed",
+            "started_at": "2026-04-16T10:00:00Z",
+            "finished_at": "2026-04-16T10:00:04Z",
+            "elapsed_ms": 4000,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.transcribe_path", fake_transcribe)
@@ -61,6 +64,9 @@ def test_transcribe_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -
     assert manifest["execution"]["transcribe"]["engine"] == "faster"
     assert manifest["execution"]["transcribe"]["error_code"] == "TRANSCRIBE_FAILED"
     assert manifest["execution"]["transcribe"]["error"] == "ffmpeg decode failed"
+    assert manifest["execution"]["transcribe"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["transcribe"]["finished_at"] == "2026-04-16T10:00:04Z"
+    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 4000
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "TRANSCRIBE_FAILED"
     assert str(result.exception) == "ffmpeg decode failed"
@@ -93,6 +99,9 @@ def test_transcribe_success_writes_manifest(monkeypatch, tmp_path: Path) -> None
             "detected_language": "en",
             "engine": "faster",
             "error": None,
+            "started_at": "2026-04-16T10:00:00Z",
+            "finished_at": "2026-04-16T10:00:03Z",
+            "elapsed_ms": 3000,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.transcribe_path", fake_transcribe)
@@ -112,6 +121,9 @@ def test_transcribe_success_writes_manifest(monkeypatch, tmp_path: Path) -> None
     assert manifest["execution"]["transcribe"]["engine"] == "faster"
     assert manifest["execution"]["transcribe"]["error_code"] is None
     assert manifest["execution"]["transcribe"]["error"] is None
+    assert manifest["execution"]["transcribe"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["transcribe"]["finished_at"] == "2026-04-16T10:00:03Z"
+    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 3000
 
 
 def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -> None:
@@ -133,6 +145,9 @@ def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) ->
             "keywords_file": None,
             "one_sentence_summary": None,
             "error": "provider rate limited",
+            "started_at": "2026-04-16T10:00:00Z",
+            "finished_at": "2026-04-16T10:00:02Z",
+            "elapsed_ms": 2000,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.summarize_transcript", fake_summarize)
@@ -148,6 +163,9 @@ def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) ->
     assert manifest["execution"]["summarize"]["provider"] == "claude"
     assert manifest["execution"]["summarize"]["error_code"] == "SUMMARY_FAILED"
     assert manifest["execution"]["summarize"]["error"] == "provider rate limited"
+    assert manifest["execution"]["summarize"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["summarize"]["finished_at"] == "2026-04-16T10:00:02Z"
+    assert manifest["execution"]["summarize"]["elapsed_ms"] == 2000
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "SUMMARY_FAILED"
     assert str(result.exception) == "provider rate limited"
@@ -174,6 +192,9 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
             "keywords_file": str(keywords),
             "one_sentence_summary": "A short summary.",
             "error": None,
+            "started_at": "2026-04-16T10:00:00Z",
+            "finished_at": "2026-04-16T10:00:01Z",
+            "elapsed_ms": 1000,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.summarize_transcript", fake_summarize)
@@ -190,6 +211,9 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
     assert manifest["execution"]["summarize"]["provider"] == "claude"
     assert manifest["execution"]["summarize"]["error_code"] is None
     assert manifest["execution"]["summarize"]["error"] is None
+    assert manifest["execution"]["summarize"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["summarize"]["finished_at"] == "2026-04-16T10:00:01Z"
+    assert manifest["execution"]["summarize"]["elapsed_ms"] == 1000
 
 
 def test_download_failure_still_writes_manifest_with_diagnostics(monkeypatch, tmp_path: Path) -> None:

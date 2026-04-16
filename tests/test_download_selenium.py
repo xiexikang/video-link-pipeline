@@ -76,6 +76,11 @@ def test_new_download_result_provides_stable_default_shape() -> None:
     assert result["warning_details"] == []
     assert result["fallback_context"] is None
     assert result["hint"] is None
+    assert result["media_duration_seconds"] is None
+    assert result["media_duration_human"] is None
+    assert result["started_at"] is None
+    assert result["finished_at"] is None
+    assert result["elapsed_ms"] is None
 
 
 def test_classify_primary_warning_covers_common_cases() -> None:
@@ -281,6 +286,9 @@ def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -
         title_hint="demo-title",
         cookie_source=CookieSource(browser=None, cookie_file=None),
         ffmpeg_path="C:/ffmpeg/bin/ffmpeg.exe",
+        video_id="demo-id",
+        duration_seconds=95.0,
+        duration_human="1:35",
         ydl_options={},
     )
 
@@ -289,6 +297,8 @@ def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -
     assert result["title"] == "demo-title"
     assert result["folder"] == str(tmp_path / "job")
     assert result["ffmpeg_path"] == "C:/ffmpeg/bin/ffmpeg.exe"
+    assert result["media_duration_seconds"] == 95.0
+    assert result["media_duration_human"] == "1:35"
 
 
 def test_apply_page_description_and_set_prepared_fallback_context(tmp_path: Path) -> None:
@@ -347,6 +357,9 @@ def test_prepare_retry_download_applies_probe_headers_and_metadata(monkeypatch, 
             self.output_dir = tmp_path / "job"
             self.title_hint = "demo"
             self.ffmpeg_path = "ffmpeg"
+            self.video_id = "demo-id"
+            self.duration_seconds = 95.0
+            self.duration_human = "1:35"
             self.ydl_options = {}
 
     captured: dict[str, object] = {}
@@ -400,6 +413,9 @@ def test_execute_primary_download_applies_metadata_and_artifacts(monkeypatch, tm
             self.output_dir = tmp_path / "job"
             self.title_hint = "demo"
             self.ffmpeg_path = "ffmpeg"
+            self.video_id = "demo-id"
+            self.duration_seconds = 95.0
+            self.duration_human = "1:35"
             self.ydl_options = {}
 
     monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
@@ -722,6 +738,9 @@ def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_
             title_hint="demo",
             cookie_source=CookieSource(),
             ffmpeg_path=None,
+            video_id="video-123",
+            duration_seconds=42.0,
+            duration_human="0:42",
             ydl_options={"skip_download": True},
         ),
     )
@@ -750,6 +769,12 @@ def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_
     assert result["subtitle"] == "video-123-demo/subtitle.srt"
     assert result["subtitle_srt"] == "video-123-demo/subtitle.srt"
     assert result["needs_whisper"] is False
+    assert result["media_duration_seconds"] == 42.0
+    assert result["media_duration_human"] == "0:42"
+    assert isinstance(result["started_at"], str)
+    assert isinstance(result["finished_at"], str)
+    assert isinstance(result["elapsed_ms"], int)
+    assert result["elapsed_ms"] >= 0
 
 
 def test_continue_after_primary_failure_delegates_to_download_failure(monkeypatch, tmp_path: Path) -> None:
@@ -926,6 +951,9 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
             self.title_hint = "demo"
             self.ffmpeg_path = "ffmpeg"
             self.url = "https://cdn.example.com/media.m3u8"
+            self.video_id = "demo-id"
+            self.duration_seconds = 95.0
+            self.duration_human = "1:35"
             self.ydl_options = {}
 
     def fake_probe_download(**kwargs):
@@ -1002,6 +1030,9 @@ def test_retry_with_selenium_context_marks_missing_explicit_media_hint(monkeypat
             self.title_hint = "demo"
             self.ffmpeg_path = "ffmpeg"
             self.url = "https://example.com/watch/demo"
+            self.video_id = "demo-id"
+            self.duration_seconds = 95.0
+            self.duration_human = "1:35"
             self.ydl_options = {}
 
     monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
@@ -1057,6 +1088,9 @@ def test_retry_with_selenium_context_marks_structured_media_hint_missing(monkeyp
             self.title_hint = "demo"
             self.ffmpeg_path = "ffmpeg"
             self.url = "https://example.com/watch/demo"
+            self.video_id = "demo-id"
+            self.duration_seconds = 95.0
+            self.duration_human = "1:35"
             self.ydl_options = {}
 
     monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
