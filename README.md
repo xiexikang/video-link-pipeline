@@ -138,6 +138,14 @@ python -m venv .venv
 python -m pytest -q
 ```
 
+当前仓库已经在仓库内 `.venv` 环境下跑通过一轮全量测试基线：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+```
+
+最近一次本地基线结果为 `93 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
+
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 
 ```bash
