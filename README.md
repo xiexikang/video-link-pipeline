@@ -337,10 +337,10 @@ vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
 
-# 只下载字幕，适合 B 站这类字幕可拿但视频格式可能受限的站点
+# 只下载字幕和元数据，适合 B 站这类字幕可拿但视频格式可能受限的站点
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 
-# 如果你还没有把项目安装成全局命令，也可以直接在仓库里运行
+# 如果你当前终端里的 `vlp` 还没更新到仓库最新代码，也可以直接在仓库里运行
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
 

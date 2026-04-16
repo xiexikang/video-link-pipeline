@@ -47,7 +47,9 @@ def test_transcribe_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -
             "engine": "faster",
             "error": "ffmpeg decode failed",
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:04Z",
+            "finished_at_local": "2026-04-16T18:00:04+08:00",
             "elapsed_ms": 4000,
         }
 
@@ -65,7 +67,9 @@ def test_transcribe_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -
     assert manifest["execution"]["transcribe"]["error_code"] == "TRANSCRIBE_FAILED"
     assert manifest["execution"]["transcribe"]["error"] == "ffmpeg decode failed"
     assert manifest["execution"]["transcribe"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["transcribe"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert manifest["execution"]["transcribe"]["finished_at"] == "2026-04-16T10:00:04Z"
+    assert manifest["execution"]["transcribe"]["finished_at_local"] == "2026-04-16T18:00:04+08:00"
     assert manifest["execution"]["transcribe"]["elapsed_ms"] == 4000
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "TRANSCRIBE_FAILED"
@@ -100,7 +104,9 @@ def test_transcribe_success_writes_manifest(monkeypatch, tmp_path: Path) -> None
             "engine": "faster",
             "error": None,
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:03Z",
+            "finished_at_local": "2026-04-16T18:00:03+08:00",
             "elapsed_ms": 3000,
         }
 
@@ -122,7 +128,9 @@ def test_transcribe_success_writes_manifest(monkeypatch, tmp_path: Path) -> None
     assert manifest["execution"]["transcribe"]["error_code"] is None
     assert manifest["execution"]["transcribe"]["error"] is None
     assert manifest["execution"]["transcribe"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["transcribe"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert manifest["execution"]["transcribe"]["finished_at"] == "2026-04-16T10:00:03Z"
+    assert manifest["execution"]["transcribe"]["finished_at_local"] == "2026-04-16T18:00:03+08:00"
     assert manifest["execution"]["transcribe"]["elapsed_ms"] == 3000
 
 
@@ -146,7 +154,9 @@ def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) ->
             "one_sentence_summary": None,
             "error": "provider rate limited",
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:02Z",
+            "finished_at_local": "2026-04-16T18:00:02+08:00",
             "elapsed_ms": 2000,
         }
 
@@ -164,7 +174,9 @@ def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) ->
     assert manifest["execution"]["summarize"]["error_code"] == "SUMMARY_FAILED"
     assert manifest["execution"]["summarize"]["error"] == "provider rate limited"
     assert manifest["execution"]["summarize"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["summarize"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert manifest["execution"]["summarize"]["finished_at"] == "2026-04-16T10:00:02Z"
+    assert manifest["execution"]["summarize"]["finished_at_local"] == "2026-04-16T18:00:02+08:00"
     assert manifest["execution"]["summarize"]["elapsed_ms"] == 2000
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "SUMMARY_FAILED"
@@ -193,7 +205,9 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
             "one_sentence_summary": "A short summary.",
             "error": None,
             "started_at": "2026-04-16T10:00:00Z",
+            "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:01Z",
+            "finished_at_local": "2026-04-16T18:00:01+08:00",
             "elapsed_ms": 1000,
         }
 
@@ -212,7 +226,9 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
     assert manifest["execution"]["summarize"]["error_code"] is None
     assert manifest["execution"]["summarize"]["error"] is None
     assert manifest["execution"]["summarize"]["started_at"] == "2026-04-16T10:00:00Z"
+    assert manifest["execution"]["summarize"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert manifest["execution"]["summarize"]["finished_at"] == "2026-04-16T10:00:01Z"
+    assert manifest["execution"]["summarize"]["finished_at_local"] == "2026-04-16T18:00:01+08:00"
     assert manifest["execution"]["summarize"]["elapsed_ms"] == 1000
 
 

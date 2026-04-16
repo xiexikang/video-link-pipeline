@@ -83,7 +83,9 @@ def new_download_result(url: str) -> dict[str, object]:
         "used_selenium_fallback": False,
         "ffmpeg_path": None,
         "started_at": None,
+        "started_at_local": None,
         "finished_at": None,
+        "finished_at_local": None,
         "elapsed_ms": None,
         "error_code": None,
         "error_stage": None,
@@ -98,6 +100,10 @@ def new_download_result(url: str) -> dict[str, object]:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _local_now() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
 
 
 def _format_duration_human(duration_seconds: float | int | None) -> str | None:
@@ -116,9 +122,17 @@ def _format_duration_human(duration_seconds: float | int | None) -> str | None:
     return f"{minutes}:{seconds:02d}"
 
 
-def _finalize_download_timing(result: dict[str, object], *, started_at: str, started_perf: float) -> None:
+def _finalize_download_timing(
+    result: dict[str, object],
+    *,
+    started_at: str,
+    started_at_local: str,
+    started_perf: float,
+) -> None:
     result["started_at"] = started_at
+    result["started_at_local"] = started_at_local
     result["finished_at"] = _utc_now()
+    result["finished_at_local"] = _local_now()
     result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
 
 
@@ -910,6 +924,7 @@ def execute_download(
     """Run the primary yt-dlp download path and return a structured result."""
     result = new_download_result(url)
     started_at = _utc_now()
+    started_at_local = _local_now()
     started_perf = perf_counter()
 
     try:
@@ -936,7 +951,12 @@ def execute_download(
             subtitle_only=subtitle_only,
         )
     finally:
-        _finalize_download_timing(result, started_at=started_at, started_perf=started_perf)
+        _finalize_download_timing(
+            result,
+            started_at=started_at,
+            started_at_local=started_at_local,
+            started_perf=started_perf,
+        )
     return result
 
 

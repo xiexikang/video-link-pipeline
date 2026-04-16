@@ -79,7 +79,9 @@ def test_new_download_result_provides_stable_default_shape() -> None:
     assert result["media_duration_seconds"] is None
     assert result["media_duration_human"] is None
     assert result["started_at"] is None
+    assert result["started_at_local"] is None
     assert result["finished_at"] is None
+    assert result["finished_at_local"] is None
     assert result["elapsed_ms"] is None
 
 
@@ -772,7 +774,9 @@ def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_
     assert result["media_duration_seconds"] == 42.0
     assert result["media_duration_human"] == "0:42"
     assert isinstance(result["started_at"], str)
+    assert isinstance(result["started_at_local"], str)
     assert isinstance(result["finished_at"], str)
+    assert isinstance(result["finished_at_local"], str)
     assert isinstance(result["elapsed_ms"], int)
     assert result["elapsed_ms"] >= 0
 

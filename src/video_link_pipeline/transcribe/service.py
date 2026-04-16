@@ -28,9 +28,21 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _finalize_timing(result: dict[str, object], *, started_at: str, started_perf: float) -> None:
+def _local_now() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
+
+
+def _finalize_timing(
+    result: dict[str, object],
+    *,
+    started_at: str,
+    started_at_local: str,
+    started_perf: float,
+) -> None:
     result["started_at"] = started_at
+    result["started_at_local"] = started_at_local
     result["finished_at"] = _utc_now()
+    result["finished_at_local"] = _local_now()
     result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
 
 
@@ -134,6 +146,7 @@ def transcribe_path(
 ) -> dict[str, object]:
     """Run transcription and write transcript/subtitle artifacts."""
     started_at = _utc_now()
+    started_at_local = _local_now()
     started_perf = perf_counter()
     resolved_input, default_output_dir, is_video = resolve_input_media(input_path)
     target_output_dir = Path(output_dir) if output_dir else default_output_dir
@@ -155,7 +168,9 @@ def transcribe_path(
         "detected_language": None,
         "error": None,
         "started_at": None,
+        "started_at_local": None,
         "finished_at": None,
+        "finished_at_local": None,
         "elapsed_ms": None,
     }
 
@@ -204,4 +219,9 @@ def transcribe_path(
         result["error"] = str(exc)
         return result
     finally:
-        _finalize_timing(result, started_at=started_at, started_perf=started_perf)
+        _finalize_timing(
+            result,
+            started_at=started_at,
+            started_at_local=started_at_local,
+            started_perf=started_perf,
+        )

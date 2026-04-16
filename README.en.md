@@ -7,6 +7,7 @@ This repository is being migrated from a collection of standalone scripts to a p
 ## Current Commands
 
 - `vlp download <url>`: download video, audio, and subtitles into a normalized job folder
+- `vlp download-subs <url>`: download subtitles and metadata only, defaulting to all subtitle languages for cases like Bilibili where subtitles may be accessible even when media formats are restricted
 - `vlp transcribe <path>`: run Whisper transcription and write `transcript.txt`, `subtitle_whisper.srt`, and `subtitle_whisper.vtt`
 - `vlp summarize <transcript.txt>`: generate `summary.md` and `keywords.json`
 - `vlp convert-subtitle <file-or-dir>`: convert between `srt` and `vtt`
@@ -328,12 +329,19 @@ Notes:
 ### Download
 
 ```bash
+# Regular video/audio/subtitle download
 vlp download "https://www.bilibili.com/video/BV..."
 vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
 vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+
+# Subtitle-only download, useful for sites like Bilibili where subtitles may be available even when media formats are restricted
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+
+# If your current `vlp` command is not picking up the latest repository code yet, run the module entry point directly
+python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
 
 ### Transcribe
