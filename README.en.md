@@ -410,6 +410,7 @@ When Selenium fallback is triggered during download, `execution.download` also c
 - `fallback_context.media_hint_url`: the preferred media URL extracted from page signals
 - `fallback_context.site_name`: the detected site name
 - `fallback_context.extraction_source`: where the media hint came from, such as `next-data:playAddr`, `jsonld:contentUrl`, `window.__INITIAL_STATE__:playAddr`, or `meta:itemprop:contentUrl`
+- `fallback_context.extraction_kind`: a stable higher-level category derived from `extraction_source`, such as `meta`, `jsonld`, `next_data`, `window_state`, or `inline_html`
 
 Common `warning_details.code` values:
 
@@ -472,6 +473,7 @@ The CLI download diagnostics now mirrors the same field names where practical so
 - `download hint=...`
 - `download warning_code=<code> stage=<stage>: ...`
 - `download fallback_context.extraction_source=...`
+- `download fallback_context.extraction_kind=...`
 - `download fallback_context.media_hint_url=...`
 - `download fallback_context.canonical_url=...`
 - `download fallback_context.resolved_url=...`

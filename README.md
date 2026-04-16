@@ -410,6 +410,7 @@ output/
 - `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
 - `fallback_context.site_name`：识别出的站点名称
 - `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`、`window.__INITIAL_STATE__:playAddr`、`meta:itemprop:contentUrl`
+- `fallback_context.extraction_kind`：对 `extraction_source` 的稳定归类，例如 `meta`、`jsonld`、`next_data`、`window_state`、`inline_html`
 
 常见 `warning_details.code` 对照：
 
@@ -472,6 +473,7 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 - `download hint=...`
 - `download warning_code=<code> stage=<stage>: ...`
 - `download fallback_context.extraction_source=...`
+- `download fallback_context.extraction_kind=...`
 - `download fallback_context.media_hint_url=...`
 - `download fallback_context.canonical_url=...`
 - `download fallback_context.resolved_url=...`

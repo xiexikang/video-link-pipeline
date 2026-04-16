@@ -144,9 +144,12 @@ def _render_download_diagnostics(result: dict[str, object]) -> None:
         log.info(f"download hint={result['hint']}")
     if isinstance(fallback_context, dict):
         extraction_source = fallback_context.get("extraction_source")
+        extraction_kind = fallback_context.get("extraction_kind")
         media_hint_url = fallback_context.get("media_hint_url")
         canonical_url = fallback_context.get("canonical_url")
         resolved_url = fallback_context.get("resolved_url")
+        if extraction_kind:
+            log.info(f"download fallback_context.extraction_kind={extraction_kind}")
         if extraction_source:
             log.info(f"download fallback_context.extraction_source={extraction_source}")
         if media_hint_url:

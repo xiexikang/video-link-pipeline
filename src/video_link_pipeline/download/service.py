@@ -22,6 +22,7 @@ from .diagnostics import (
 from .selenium_fallback import (
     SeleniumContext,
     SeleniumFallbackError,
+    classify_extraction_kind,
     run_selenium_browser_context,
     should_attempt_selenium_fallback,
 )
@@ -269,6 +270,7 @@ def _build_fallback_context(context: SeleniumContext) -> dict[str, str]:
         "media_hint_url": context.media_hint_url,
         "site_name": context.site_name,
         "extraction_source": context.extraction_source,
+        "extraction_kind": classify_extraction_kind(context.extraction_source),
     }
 
 
@@ -281,10 +283,15 @@ def _missing_explicit_media_hint(context: SeleniumContext) -> bool:
 
 def _record_fallback_prepare_warnings(result: dict[str, object], context: SeleniumContext) -> None:
     """Record warnings emitted while preparing fallback browser context."""
+    extraction_kind = classify_extraction_kind(context.extraction_source)
     _append_warning(
         result,
         code="fallback_context_prepared",
-        message=f"selenium fallback context prepared via {context.extraction_source or 'browser-dom'}",
+        message=(
+            "selenium fallback context prepared "
+            f"via {context.extraction_source or 'browser-dom'} "
+            f"(kind={extraction_kind})"
+        ),
         stage="fallback_prepare",
     )
     if _missing_explicit_media_hint(context):

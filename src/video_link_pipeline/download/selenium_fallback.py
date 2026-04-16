@@ -69,6 +69,28 @@ class SeleniumFallbackError(VlpError):
         super().__init__(message=message, error_code="DOWNLOAD_FAILED", hint=hint)
 
 
+def classify_extraction_kind(source: str | None) -> str:
+    """Collapse detailed extraction sources into stable higher-level categories."""
+    normalized = str(source or "").strip().lower()
+    if not normalized:
+        return "unknown"
+    if normalized.startswith("meta:"):
+        return "meta"
+    if normalized.startswith("jsonld"):
+        return "jsonld"
+    if normalized.startswith("next-data") or normalized.startswith("window.__next_data__"):
+        return "next_data"
+    if normalized.startswith("window.__") or normalized.startswith("window._router_data"):
+        return "window_state"
+    if normalized.startswith("dom:"):
+        return "dom"
+    if normalized.startswith("inline-script"):
+        return "inline_script"
+    if normalized.startswith("inline-html"):
+        return "inline_html"
+    return "other"
+
+
 def selenium_extra_available() -> bool:
     """Return whether the optional Selenium dependencies are installed."""
     return (
