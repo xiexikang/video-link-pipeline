@@ -413,6 +413,7 @@ For v1, the download execution section should standardize on these additional fi
 - `fallback_context.media_hint_url`: the extracted media retry URL when available
 - `fallback_context.site_name`: detected site name
 - `fallback_context.extraction_source`: the source of the media hint, such as `next-data:playAddr`, `jsonld:contentUrl`, `window.__INITIAL_STATE__:playAddr`, `window.__DATA__:playAddr`, or `meta:itemprop:contentUrl`
+- `fallback_context.extraction_kind`: a stable grouped category derived from `extraction_source`, such as `meta`, `jsonld`, `next_data`, `window_state`, `dom`, or `inline_html`
 
 Representative warning codes include:
 

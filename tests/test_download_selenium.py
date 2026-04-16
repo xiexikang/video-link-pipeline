@@ -6,6 +6,7 @@ from video_link_pipeline.download.cookies import CookieSource
 from video_link_pipeline.download.selenium_fallback import (
     SeleniumContext,
     SeleniumFallbackError,
+    classify_extraction_kind,
     choose_best_media_hint,
     extract_page_signals_from_html,
     should_attempt_selenium_fallback,
@@ -48,6 +49,17 @@ def test_should_attempt_selenium_fallback_auto_only_for_anti_crawl_errors() -> N
     assert should_attempt_selenium_fallback("auto", "network timeout") is False
     assert should_attempt_selenium_fallback("off", "403 forbidden") is False
     assert should_attempt_selenium_fallback("on", "anything") is True
+
+
+def test_classify_extraction_kind_covers_common_signal_families() -> None:
+    assert classify_extraction_kind("meta:itemprop:contentUrl") == "meta"
+    assert classify_extraction_kind("jsonld:contentUrl") == "jsonld"
+    assert classify_extraction_kind("next-data:playAddr") == "next_data"
+    assert classify_extraction_kind("window.__DATA__:playAddr") == "window_state"
+    assert classify_extraction_kind("dom:video") == "dom"
+    assert classify_extraction_kind("inline-script") == "inline_script"
+    assert classify_extraction_kind("inline-html") == "inline_html"
+    assert classify_extraction_kind(None) == "unknown"
 
 
 def test_new_download_result_provides_stable_default_shape() -> None:
@@ -173,6 +185,7 @@ def test_build_fallback_context_returns_stable_manifest_shape(tmp_path: Path) ->
         "media_hint_url": "https://cdn.example.com/media.m3u8",
         "site_name": "example.com",
         "extraction_source": "jsonld:contentUrl",
+        "extraction_kind": "jsonld",
     }
 
 
@@ -399,8 +412,10 @@ def test_record_retry_context_state_updates_description_context_and_status(tmp_p
         "media_hint_url": "https://cdn.example.com/media.m3u8",
         "site_name": "example.com",
         "extraction_source": "jsonld:contentUrl",
+        "extraction_kind": "jsonld",
     }
     assert result["warning_details"][0]["code"] == "fallback_context_prepared"
+    assert "kind=jsonld" in result["warning_details"][0]["message"]
 
 
 def test_handle_fallback_vlp_error_records_dependency_failure_and_hint() -> None:
@@ -866,6 +881,7 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
     assert result["used_selenium_fallback"] is True
     assert result["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
     assert result["fallback_context"]["extraction_source"] == "jsonld:contentUrl"
+    assert result["fallback_context"]["extraction_kind"] == "jsonld"
     assert result["warning_details"][0]["code"] == "fallback_context_prepared"
     assert result["warning_details"][0]["description"]
     assert any("selenium fallback context prepared" in item for item in result["warnings"])
