@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from ..errors import ConfigError, InputNotFoundError, VlpError
@@ -20,6 +22,16 @@ class TranscribeError(VlpError):
 
     def __init__(self, message: str, hint: str | None = None) -> None:
         super().__init__(message=message, error_code="TRANSCRIBE_FAILED", hint=hint)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _finalize_timing(result: dict[str, object], *, started_at: str, started_perf: float) -> None:
+    result["started_at"] = started_at
+    result["finished_at"] = _utc_now()
+    result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
 
 
 def normalize_engine_name(engine: str) -> str:
@@ -121,6 +133,8 @@ def transcribe_path(
     engine: str = "auto",
 ) -> dict[str, object]:
     """Run transcription and write transcript/subtitle artifacts."""
+    started_at = _utc_now()
+    started_perf = perf_counter()
     resolved_input, default_output_dir, is_video = resolve_input_media(input_path)
     target_output_dir = Path(output_dir) if output_dir else default_output_dir
     target_output_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +154,9 @@ def transcribe_path(
         "segments": [],
         "detected_language": None,
         "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "elapsed_ms": None,
     }
 
     try:
@@ -186,3 +203,5 @@ def transcribe_path(
     except Exception as exc:
         result["error"] = str(exc)
         return result
+    finally:
+        _finalize_timing(result, started_at=started_at, started_perf=started_perf)

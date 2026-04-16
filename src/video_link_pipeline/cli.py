@@ -108,6 +108,14 @@ def _write_download_manifest(
         command=command_name,
         input_data={"url": url, "input_path": None},
         config_effective=config_snapshot,
+        media={
+            key: value
+            for key, value in {
+                "duration_seconds": result.get("media_duration_seconds"),
+                "duration_human": result.get("media_duration_human"),
+            }.items()
+            if value is not None
+        },
         artifacts={key: value for key, value in artifacts.items() if value is not None},
         execution={
             "download": {
@@ -118,6 +126,9 @@ def _write_download_manifest(
                 "error_code": result.get("error_code") or (None if result.get("success") else "DOWNLOAD_FAILED"),
                 "error": result.get("error"),
                 "hint": result.get("hint"),
+                "started_at": result.get("started_at"),
+                "finished_at": result.get("finished_at"),
+                "elapsed_ms": result.get("elapsed_ms"),
                 "warnings": list(result.get("warnings") or []),
                 "warning_details": list(result.get("warning_details") or []),
             }
@@ -305,6 +316,9 @@ def _write_transcribe_manifest(
                 "engine": result.get("engine"),
                 "error_code": None if result.get("success") else "TRANSCRIBE_FAILED",
                 "error": result.get("error"),
+                "started_at": result.get("started_at"),
+                "finished_at": result.get("finished_at"),
+                "elapsed_ms": result.get("elapsed_ms"),
                 "warnings": [],
             }
         },
@@ -341,6 +355,9 @@ def _write_summary_manifest(
                 "provider": result.get("provider"),
                 "error_code": None if result.get("success") else "SUMMARY_FAILED",
                 "error": result.get("error"),
+                "started_at": result.get("started_at"),
+                "finished_at": result.get("finished_at"),
+                "elapsed_ms": result.get("elapsed_ms"),
                 "warnings": [],
             }
         },
@@ -401,6 +418,9 @@ def _write_reused_transcript_manifest(
                 "reused_existing": True,
                 "error_code": None,
                 "error": None,
+                "started_at": None,
+                "finished_at": None,
+                "elapsed_ms": 0,
                 "warnings": ["reused existing transcript"],
             }
         },
@@ -440,6 +460,9 @@ def _write_reused_summary_manifest(
                 "reused_existing": True,
                 "error_code": None,
                 "error": None,
+                "started_at": None,
+                "finished_at": None,
+                "elapsed_ms": 0,
                 "warnings": ["reused existing summary"],
             }
         },

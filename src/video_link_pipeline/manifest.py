@@ -40,6 +40,7 @@ def create_manifest(
         "command": command,
         "input": input_data or {"url": None, "input_path": None},
         "config_effective": config_effective or {},
+        "media": {},
         "artifacts": {},
         "execution": {},
     }
@@ -87,6 +88,7 @@ def update_manifest(
     command: str | None = None,
     input_data: dict[str, Any] | None = None,
     config_effective: dict[str, Any] | None = None,
+    media: dict[str, Any] | None = None,
     artifacts: dict[str, Any] | None = None,
     execution: dict[str, Any] | None = None,
 ) -> Manifest:
@@ -98,6 +100,8 @@ def update_manifest(
         patch["input"] = input_data
     if config_effective:
         patch["config_effective"] = config_effective
+    if media:
+        patch["media"] = media
     if artifacts:
         patch["artifacts"] = artifacts
     if execution:
@@ -137,6 +141,7 @@ def upsert_manifest(
     command: str | None = None,
     input_data: dict[str, Any] | None = None,
     config_effective: dict[str, Any] | None = None,
+    media: dict[str, Any] | None = None,
     artifacts: dict[str, Any] | None = None,
     execution: dict[str, Any] | None = None,
 ) -> Manifest:
@@ -147,6 +152,7 @@ def upsert_manifest(
         command=command,
         input_data=input_data,
         config_effective=config_effective,
+        media=media,
         artifacts=artifacts,
         execution=execution,
     )

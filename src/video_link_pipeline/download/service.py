@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from urllib.parse import urlparse
 
@@ -38,6 +40,9 @@ class DownloadPreparation:
     title_hint: str
     cookie_source: CookieSource
     ffmpeg_path: str | None
+    video_id: str | None
+    duration_seconds: float | int | None
+    duration_human: str | None
     ydl_options: dict[str, Any]
 
 
@@ -72,9 +77,14 @@ def new_download_result(url: str) -> dict[str, object]:
         "subtitle_vtt": None,
         "subtitle_srt": None,
         "info": None,
+        "media_duration_seconds": None,
+        "media_duration_human": None,
         "needs_whisper": False,
         "used_selenium_fallback": False,
         "ffmpeg_path": None,
+        "started_at": None,
+        "finished_at": None,
+        "elapsed_ms": None,
         "error_code": None,
         "error_stage": None,
         "fallback_status": "not_attempted",
@@ -84,6 +94,32 @@ def new_download_result(url: str) -> dict[str, object]:
         "error": None,
         "hint": None,
     }
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _format_duration_human(duration_seconds: float | int | None) -> str | None:
+    if duration_seconds is None:
+        return None
+    try:
+        total_seconds = int(round(float(duration_seconds)))
+    except (TypeError, ValueError):
+        return None
+    if total_seconds < 0:
+        return None
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes}:{seconds:02d}"
+
+
+def _finalize_download_timing(result: dict[str, object], *, started_at: str, started_perf: float) -> None:
+    result["started_at"] = started_at
+    result["finished_at"] = _utc_now()
+    result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
 
 
 def _warning_details(result: dict[str, object]) -> list[dict[str, str]]:
@@ -320,6 +356,8 @@ def _apply_preparation_metadata(result: dict[str, object], preparation: Download
     result["title"] = preparation.title_hint
     result["folder"] = str(preparation.output_dir)
     result["ffmpeg_path"] = preparation.ffmpeg_path
+    result["media_duration_seconds"] = preparation.duration_seconds
+    result["media_duration_human"] = preparation.duration_human
 
 
 def _build_retry_headers(context: SeleniumContext) -> dict[str, str]:
@@ -565,6 +603,9 @@ def prepare_download(
         title_hint=title,
         cookie_source=cookie_source,
         ffmpeg_path=ffmpeg_path,
+        video_id=None,
+        duration_seconds=None,
+        duration_human=None,
         ydl_options=ydl_options,
     )
 
@@ -643,6 +684,8 @@ def probe_download(
 
     raw_title = info.get("title") or "download"
     video_id = info.get("id")
+    duration_seconds = info.get("duration")
+    duration_human = info.get("duration_string") or _format_duration_human(duration_seconds)
     return prepare_download(
         url=url,
         output_dir=output_dir,
@@ -660,6 +703,9 @@ def probe_download(
         title_hint=sanitize_filename(raw_title),
         cookie_source=probe_prep.cookie_source,
         ffmpeg_path=probe_prep.ffmpeg_path,
+        video_id=str(video_id) if video_id else None,
+        duration_seconds=duration_seconds if isinstance(duration_seconds, (int, float)) else None,
+        duration_human=str(duration_human) if duration_human else None,
         ydl_options=build_base_ydl_options(
             output_template=str(resolve_job_directory(output_dir, raw_title, video_id) / f"{sanitize_filename(raw_title)}.%(ext)s"),
             languages=languages or ["zh", "en"],
@@ -863,9 +909,11 @@ def execute_download(
 ) -> dict[str, object]:
     """Run the primary yt-dlp download path and return a structured result."""
     result = new_download_result(url)
+    started_at = _utc_now()
+    started_perf = perf_counter()
 
     try:
-        return _execute_primary_download(
+        result = _execute_primary_download(
             url=url,
             output_dir=output_dir,
             languages=languages,
@@ -878,7 +926,7 @@ def execute_download(
         )
     except Exception as exc:
         _record_primary_exception(result, exc)
-        return _continue_after_primary_failure(
+        result = _continue_after_primary_failure(
             result=result,
             output_dir=output_dir,
             selenium_mode=selenium_mode,
@@ -887,6 +935,9 @@ def execute_download(
             audio_only=audio_only,
             subtitle_only=subtitle_only,
         )
+    finally:
+        _finalize_download_timing(result, started_at=started_at, started_perf=started_perf)
+    return result
 
 
 def _handle_download_failure(
