@@ -253,6 +253,50 @@ def _find_existing_transcript(job_dir: Path) -> Path | None:
     return matches[0] if matches else None
 
 
+def _write_reused_transcript_manifest(
+    *,
+    transcript_path: Path,
+    effective_config: dict[str, Any],
+    output_root: Path,
+    input_path: Path,
+) -> Path | None:
+    if not transcript_path.exists():
+        return None
+
+    manifest_path = transcript_path.parent / "manifest.json"
+    config_snapshot = redact_config(effective_config)
+    transcript_dir = transcript_path.parent
+    srt_file = transcript_dir / "subtitle_whisper.srt"
+    vtt_file = transcript_dir / "subtitle_whisper.vtt"
+    json_file = transcript_dir / "transcript.json"
+    artifacts = {
+        "transcript_txt": _relative_to_root(str(transcript_path), output_root),
+        "subtitle_srt": _relative_to_root(str(srt_file), output_root) if srt_file.exists() else None,
+        "subtitle_vtt": _relative_to_root(str(vtt_file), output_root) if vtt_file.exists() else None,
+        "transcript_json": _relative_to_root(str(json_file), output_root) if json_file.exists() else None,
+    }
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp run",
+        input_data={"url": None, "input_path": str(input_path)},
+        config_effective=config_snapshot,
+        artifacts={key: value for key, value in artifacts.items() if value is not None},
+        execution={
+            "transcribe": {
+                "success": True,
+                "detected_language": None,
+                "engine": None,
+                "reused_existing": True,
+                "error_code": None,
+                "error": None,
+                "warnings": ["reused existing transcript"],
+            }
+        },
+    )
+    return manifest_path
+
+
 def _finalize_run_manifest(
     manifest_path: Path | None,
     *,
@@ -569,6 +613,12 @@ def run_command(
         log.success("transcription completed")
         log.info(f"transcript={transcribe_result['transcript_file']}")
     elif transcript_path is not None:
+        manifest_path = _write_reused_transcript_manifest(
+            transcript_path=transcript_path,
+            effective_config=effective,
+            output_root=output_root,
+            input_path=job_dir,
+        ) or manifest_path
         log.info(f"reusing existing transcript={transcript_path}")
 
     if do_summary:
