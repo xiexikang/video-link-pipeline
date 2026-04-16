@@ -375,20 +375,31 @@ def _handle_fallback_vlp_error(result: dict[str, object], exc: VlpError) -> None
         fallback_status=failure_state.fallback_status,
     )
     if failure_state.preferred_hint_code:
+        generic_hint = preferred_warning_hint(failure_state.preferred_hint_code, exc.hint)
         _set_result_hint(
             result,
-            preferred_warning_hint(failure_state.preferred_hint_code, exc.hint),
+            generic_hint,
             overwrite=True,
         )
+    else:
+        generic_hint = None
 
     if exc.hint:
-        _append_hint_warning(
+        warning_code = _append_hint_warning(
             result,
             hint=exc.hint,
             default_code=failure_state.warning_code,
             stage=str(result["error_stage"] or "download"),
             overwrite_hint=False,
         )
+        if warning_code != failure_state.warning_code:
+            specific_hint = preferred_warning_hint(warning_code, exc.hint)
+            if not result.get("hint") or result.get("hint") == generic_hint:
+                _set_result_hint(
+                    result,
+                    specific_hint,
+                    overwrite=True,
+                )
 
 
 def _handle_unexpected_fallback_exception(result: dict[str, object], exc: Exception) -> None:
@@ -653,19 +664,22 @@ def _populate_result_from_artifacts(
     output_root: Path,
     audio_only: bool,
 ) -> dict[str, object]:
+    def _relpath(name: str) -> str:
+        return (output_dir / name).relative_to(output_root).as_posix()
+
     if artifacts["video"]:
-        result["video"] = str((output_dir / artifacts["video"]).relative_to(output_root))
+        result["video"] = _relpath(artifacts["video"])
     if artifacts["audio_mp3"]:
-        result["audio"] = str((output_dir / artifacts["audio_mp3"]).relative_to(output_root))
+        result["audio"] = _relpath(artifacts["audio_mp3"])
     elif artifacts["audio_m4a"]:
-        result["audio"] = str((output_dir / artifacts["audio_m4a"]).relative_to(output_root))
+        result["audio"] = _relpath(artifacts["audio_m4a"])
     if artifacts["subtitle_vtt"]:
-        result["subtitle"] = str((output_dir / artifacts["subtitle_vtt"]).relative_to(output_root))
+        result["subtitle"] = _relpath(artifacts["subtitle_vtt"])
         result["subtitle_vtt"] = result["subtitle"]
     if artifacts["subtitle_srt"]:
-        result["subtitle_srt"] = str((output_dir / artifacts["subtitle_srt"]).relative_to(output_root))
+        result["subtitle_srt"] = _relpath(artifacts["subtitle_srt"])
     if artifacts["info_json"]:
-        result["info"] = str((output_dir / artifacts["info_json"]).relative_to(output_root))
+        result["info"] = _relpath(artifacts["info_json"])
     if not audio_only and not result["subtitle"]:
         result["needs_whisper"] = True
     result["success"] = True

@@ -626,7 +626,10 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert result["warning_details"][0]["code"] == "primary_http_403"
     assert result["warning_details"][0]["description"]
     assert result["warning_details"][1]["code"] == "fallback_dependency_hint"
-    assert "pip install 'video-link-pipeline[selenium]'" in str(result["hint"])
+    assert (
+        str(result["hint"])
+        == 'Install the Selenium extra with `pip install "video-link-pipeline[selenium]"` and make sure Chrome can start normally.'
+    )
     assert "optional dependencies are not installed" in str(result["error"])
 
 
