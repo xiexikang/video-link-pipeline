@@ -144,7 +144,7 @@ The repository has already been validated once against a full local pytest basel
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The latest local baseline result was `93 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
+The latest local baseline result was `100 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
 
 If you are contributing locally, install the dev extra:
 
@@ -409,7 +409,7 @@ When Selenium fallback is triggered during download, `execution.download` also c
 - `fallback_context.canonical_url`: the canonical page URL when available
 - `fallback_context.media_hint_url`: the preferred media URL extracted from page signals
 - `fallback_context.site_name`: the detected site name
-- `fallback_context.extraction_source`: where the media hint came from, such as `next-data:playAddr` or `jsonld:contentUrl`
+- `fallback_context.extraction_source`: where the media hint came from, such as `next-data:playAddr`, `jsonld:contentUrl`, `window.__INITIAL_STATE__:playAddr`, or `meta:itemprop:contentUrl`
 
 Common `warning_details.code` values:
 

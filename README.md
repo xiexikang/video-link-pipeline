@@ -144,7 +144,7 @@ python -m pytest -q
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-最近一次本地基线结果为 `93 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
+最近一次本地基线结果为 `100 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
 
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 
@@ -409,7 +409,7 @@ output/
 - `fallback_context.canonical_url`：页面 canonical 或等价主地址
 - `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
 - `fallback_context.site_name`：识别出的站点名称
-- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`
+- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`、`window.__INITIAL_STATE__:playAddr`、`meta:itemprop:contentUrl`
 
 常见 `warning_details.code` 对照：
 

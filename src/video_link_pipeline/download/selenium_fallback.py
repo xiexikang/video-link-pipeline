@@ -27,6 +27,16 @@ ANTI_CRAWL_MARKERS = (
     "temporarily unavailable",
 )
 
+INLINE_STATE_SOURCES = (
+    "__INITIAL_STATE__",
+    "__NUXT__",
+    "__NEXT_DATA__",
+    "__INITIAL_PROPS__",
+    "__APP_DATA__",
+    "__DATA__",
+    "__STATE__",
+)
+
 
 DEFAULT_MOBILE_USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
@@ -177,11 +187,21 @@ def _wait_for_media_signals(driver: object) -> None:
                     """
                     const video = document.querySelector('video, source[src], video source[src]');
                     const ogVideo = document.querySelector('meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"]');
+                    const contentUrl = document.querySelector('meta[itemprop="contentUrl"]');
+                    const twitterPlayer = document.querySelector('meta[property="twitter:player"], meta[name="twitter:player"]');
                     const ogUrl = document.querySelector('meta[property="og:url"], link[rel="canonical"]');
                     const nextData = document.querySelector('#__NEXT_DATA__');
                     const jsonLd = document.querySelector('script[type="application/ld+json"]');
-                    const globals = window.__INITIAL_STATE__ || window.__NUXT__ || window.__NEXT_DATA__ || window._ROUTER_DATA;
-                    return video || ogVideo || ogUrl || nextData || jsonLd || globals;
+                    const globals =
+                      window.__INITIAL_STATE__ ||
+                      window.__NUXT__ ||
+                      window.__NEXT_DATA__ ||
+                      window.__INITIAL_PROPS__ ||
+                      window.__APP_DATA__ ||
+                      window.__DATA__ ||
+                      window.__STATE__ ||
+                      window._ROUTER_DATA;
+                    return video || ogVideo || contentUrl || twitterPlayer || ogUrl || nextData || jsonLd || globals;
                     """
                 )
             )
@@ -246,6 +266,9 @@ def _extract_page_signals(driver: object) -> dict[str, str]:
             pushCandidate(read('meta[property="og:video:url"]'), 'meta:og:video:url');
             pushCandidate(read('meta[property="og:video"]'), 'meta:og:video');
             pushCandidate(read('meta[property="twitter:player:stream"]'), 'meta:twitter:player:stream');
+            pushCandidate(read('meta[property="twitter:player"]'), 'meta:twitter:player');
+            pushCandidate(read('meta[name="twitter:player"]'), 'meta:name:twitter:player');
+            pushCandidate(read('meta[itemprop="contentUrl"]'), 'meta:itemprop:contentUrl');
 
             const jsonLdNodes = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).slice(0, 10);
             for (const node of jsonLdNodes) {
@@ -265,6 +288,10 @@ def _extract_page_signals(driver: object) -> dict[str, str]:
             if (window.__NEXT_DATA__) pickFromObject(window.__NEXT_DATA__, 'window.__NEXT_DATA__');
             if (window.__INITIAL_STATE__) pickFromObject(window.__INITIAL_STATE__, 'window.__INITIAL_STATE__');
             if (window.__NUXT__) pickFromObject(window.__NUXT__, 'window.__NUXT__');
+            if (window.__INITIAL_PROPS__) pickFromObject(window.__INITIAL_PROPS__, 'window.__INITIAL_PROPS__');
+            if (window.__APP_DATA__) pickFromObject(window.__APP_DATA__, 'window.__APP_DATA__');
+            if (window.__DATA__) pickFromObject(window.__DATA__, 'window.__DATA__');
+            if (window.__STATE__) pickFromObject(window.__STATE__, 'window.__STATE__');
             if (window._ROUTER_DATA) pickFromObject(window._ROUTER_DATA, 'window._ROUTER_DATA');
 
             const inlineScripts = Array.from(document.scripts).slice(0, 20);
@@ -348,6 +375,19 @@ def extract_page_signals_from_html(
             continue
         _collect_media_candidates(parsed, "jsonld", candidates)
 
+    meta_patterns = (
+        (r'<meta[^>]+property=["\']og:video:secure_url["\'][^>]+content=["\']([^"\']+)["\']', "meta:og:video:secure_url"),
+        (r'<meta[^>]+property=["\']og:video:url["\'][^>]+content=["\']([^"\']+)["\']', "meta:og:video:url"),
+        (r'<meta[^>]+property=["\']og:video["\'][^>]+content=["\']([^"\']+)["\']', "meta:og:video"),
+        (r'<meta[^>]+property=["\']twitter:player:stream["\'][^>]+content=["\']([^"\']+)["\']', "meta:twitter:player:stream"),
+        (r'<meta[^>]+property=["\']twitter:player["\'][^>]+content=["\']([^"\']+)["\']', "meta:twitter:player"),
+        (r'<meta[^>]+name=["\']twitter:player["\'][^>]+content=["\']([^"\']+)["\']', "meta:name:twitter:player"),
+        (r'<meta[^>]+itemprop=["\']contentUrl["\'][^>]+content=["\']([^"\']+)["\']', "meta:itemprop:contentUrl"),
+    )
+    for pattern, source in meta_patterns:
+        for match in re.findall(pattern, html, flags=re.IGNORECASE):
+            add_candidate(match.strip(), source)
+
     next_data_match = re.search(
         r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
         html,
@@ -358,6 +398,20 @@ def extract_page_signals_from_html(
             _collect_media_candidates(json.loads(next_data_match.group(1).strip()), "next-data", candidates)
         except json.JSONDecodeError:
             pass
+
+    for state_name in INLINE_STATE_SOURCES:
+        state_match = re.search(
+            rf"{re.escape(state_name)}\s*=\s*(\{{.*?\}})\s*;",
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if not state_match:
+            continue
+        try:
+            parsed = json.loads(state_match.group(1).strip())
+        except json.JSONDecodeError:
+            continue
+        _collect_media_candidates(parsed, f"window.{state_name}", candidates)
 
     for match in re.findall(r'https?://[^"\'\s]+(?:m3u8|mp4|mpd)[^"\'\s]*', html, flags=re.IGNORECASE):
         add_candidate(match, "inline-html")
