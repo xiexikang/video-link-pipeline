@@ -77,11 +77,13 @@ def _download_manifest_path(result: dict[str, object], output_root: Path) -> Pat
 
 def _write_download_manifest(
     *,
+    command_name: str,
     result: dict[str, object],
     effective_config: dict[str, Any],
     output_root: Path,
     url: str,
     audio_only: bool,
+    subtitle_only: bool,
 ) -> Path | None:
     manifest_path = _download_manifest_path(result, output_root)
     if manifest_path is None:
@@ -99,10 +101,11 @@ def _write_download_manifest(
     config_snapshot = redact_config(effective_config)
     config_snapshot["download"] = dict(config_snapshot.get("download", {}))
     config_snapshot["download"]["audio_only"] = audio_only
+    config_snapshot["download"]["subtitle_only"] = subtitle_only
 
     upsert_manifest(
         manifest_path,
-        command="vlp download",
+        command=command_name,
         input_data={"url": url, "input_path": None},
         config_effective=config_snapshot,
         artifacts={key: value for key, value in artifacts.items() if value is not None},
@@ -121,6 +124,103 @@ def _write_download_manifest(
         },
     )
     return manifest_path
+
+
+def _download_overrides(
+    *,
+    output_dir: Path | None,
+    sub_lang: list[str] | None,
+    quality: str | None,
+    cookies_from_browser: str | None,
+    cookie_file: Path | None,
+    selenium: str | None,
+) -> dict[str, Any]:
+    return {
+        "output_dir": str(output_dir) if output_dir else None,
+        "download": {
+            "subtitles_langs": sub_lang,
+            "quality": quality,
+            "cookie_file": str(cookie_file) if cookie_file else None,
+            "cookies_from_browser": cookies_from_browser,
+            "selenium": selenium,
+        },
+    }
+
+
+def _run_download_command(
+    *,
+    command_name: str,
+    success_message: str,
+    url: str,
+    output_dir: Path | None,
+    sub_lang: list[str] | None,
+    quality: str | None,
+    audio_only: bool,
+    subtitle_only: bool,
+    cookies_from_browser: str | None,
+    cookie_file: Path | None,
+    selenium: str | None,
+    config: Path,
+) -> None:
+    bundle = _command_context(
+        config,
+        _download_overrides(
+            output_dir=output_dir,
+            sub_lang=sub_lang,
+            quality=quality,
+            cookies_from_browser=cookies_from_browser,
+            cookie_file=cookie_file,
+            selenium=selenium,
+        ),
+    )
+    effective = bundle.effective_config
+    download_config = effective["download"]
+    output_root = Path(effective["output_dir"])
+
+    log.info(f"loaded configuration from {bundle.source_path or 'defaults/.env/environment'}")
+    log.info(f"output_dir={effective['output_dir']}")
+    result = execute_download(
+        url=url,
+        output_dir=effective["output_dir"],
+        languages=download_config["subtitles_langs"],
+        quality=download_config["quality"],
+        audio_only=audio_only,
+        subtitle_only=subtitle_only,
+        cookies_from_browser=download_config.get("cookies_from_browser"),
+        cookie_file=download_config.get("cookie_file"),
+        selenium_mode=download_config["selenium"],
+    )
+
+    manifest_path = _write_download_manifest(
+        command_name=command_name,
+        result=result,
+        effective_config=effective,
+        output_root=output_root,
+        url=url,
+        audio_only=audio_only,
+        subtitle_only=subtitle_only,
+    )
+    _render_download_diagnostics(result)
+
+    if not result["success"]:
+        raise VlpError(
+            str(result["error"] or "download failed"),
+            error_code=str(result.get("error_code") or "DOWNLOAD_FAILED"),
+            hint=str(result.get("hint") or "") or None,
+        )
+
+    log.success(success_message)
+    log.info(f"folder={result['folder']}")
+    if result.get("video"):
+        log.info(f"video={result['video']}")
+    if result.get("audio"):
+        log.info(f"audio={result['audio']}")
+    if result.get("subtitle"):
+        log.info(f"subtitle={result['subtitle']}")
+    if result.get("needs_whisper"):
+        log.warning("download completed without subtitles; transcription may be needed")
+    if manifest_path is not None:
+        log.info(f"manifest={manifest_path}")
 
 
 def _render_download_diagnostics(result: dict[str, object]) -> None:
@@ -385,62 +485,47 @@ def download_command(
     selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
-    overrides = {
-        "output_dir": str(output_dir) if output_dir else None,
-        "download": {
-            "subtitles_langs": sub_lang,
-            "quality": quality,
-            "cookie_file": str(cookie_file) if cookie_file else None,
-            "cookies_from_browser": cookies_from_browser,
-            "selenium": selenium,
-        },
-    }
-    bundle = _command_context(config, overrides)
-    effective = bundle.effective_config
-    download_config = effective["download"]
-    output_root = Path(effective["output_dir"])
-
-    log.info(f"loaded configuration from {bundle.source_path or 'defaults/.env/environment'}")
-    log.info(f"output_dir={effective['output_dir']}")
-    result = execute_download(
+    _run_download_command(
+        command_name="vlp download",
+        success_message="download completed",
         url=url,
-        output_dir=effective["output_dir"],
-        languages=download_config["subtitles_langs"],
-        quality=download_config["quality"],
+        output_dir=output_dir,
+        sub_lang=sub_lang,
+        quality=quality,
         audio_only=audio_only,
-        cookies_from_browser=download_config.get("cookies_from_browser"),
-        cookie_file=download_config.get("cookie_file"),
-        selenium_mode=download_config["selenium"],
+        subtitle_only=False,
+        cookies_from_browser=cookies_from_browser,
+        cookie_file=cookie_file,
+        selenium=selenium,
+        config=config,
     )
 
-    manifest_path = _write_download_manifest(
-        result=result,
-        effective_config=effective,
-        output_root=output_root,
+
+@app.command("download-subs")
+def download_subtitles_command(
+    url: str,
+    output_dir: Path | None = typer.Option(None, "--output-dir", help="Output root directory."),
+    sub_lang: list[str] | None = typer.Option(None, "--sub-lang", help="Subtitle languages."),
+    quality: str | None = typer.Option(None, "--quality", help="yt-dlp format selector."),
+    cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
+    cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
+    selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
+    config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
+) -> None:
+    _run_download_command(
+        command_name="vlp download-subs",
+        success_message="subtitle download completed",
         url=url,
-        audio_only=audio_only,
+        output_dir=output_dir,
+        sub_lang=sub_lang or ["all"],
+        quality=quality,
+        audio_only=False,
+        subtitle_only=True,
+        cookies_from_browser=cookies_from_browser,
+        cookie_file=cookie_file,
+        selenium=selenium,
+        config=config,
     )
-    _render_download_diagnostics(result)
-
-    if not result["success"]:
-        raise VlpError(
-            str(result["error"] or "download failed"),
-            error_code=str(result.get("error_code") or "DOWNLOAD_FAILED"),
-            hint=str(result.get("hint") or "") or None,
-        )
-
-    log.success("download completed")
-    log.info(f"folder={result['folder']}")
-    if result.get("video"):
-        log.info(f"video={result['video']}")
-    if result.get("audio"):
-        log.info(f"audio={result['audio']}")
-    if result.get("subtitle"):
-        log.info(f"subtitle={result['subtitle']}")
-    if result.get("needs_whisper"):
-        log.warning("download completed without subtitles; transcription may be needed")
-    if manifest_path is not None:
-        log.info(f"manifest={manifest_path}")
 
 
 @app.command("transcribe")
@@ -609,16 +694,19 @@ def run_command(
         languages=download_config["subtitles_langs"],
         quality=download_config["quality"],
         audio_only=False,
+        subtitle_only=False,
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
         selenium_mode=download_config["selenium"],
     )
     manifest_path = _write_download_manifest(
+        command_name="vlp download",
         result=download_result,
         effective_config=effective,
         output_root=output_root,
         url=url,
         audio_only=False,
+        subtitle_only=False,
     )
     _render_download_diagnostics(download_result)
     if not download_result["success"]:

@@ -332,3 +332,56 @@ def test_download_failure_manifest_defaults_error_code_when_missing(monkeypatch,
     assert download_execution["warning_details"][0]["code"] == "primary_download_failed"
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FAILED"
+
+
+def test_download_subs_command_records_subtitle_only_manifest(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "video-subs-demo"
+    job_dir.mkdir(parents=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"output_dir": str(output_root)}, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_download(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        (job_dir / "subtitle.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+        return {
+            "success": True,
+            "folder": "video-subs-demo",
+            "video": None,
+            "audio": None,
+            "subtitle": "video-subs-demo/subtitle.srt",
+            "subtitle_vtt": None,
+            "subtitle_srt": "video-subs-demo/subtitle.srt",
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": False,
+            "error_code": None,
+            "error_stage": None,
+            "fallback_status": "not_attempted",
+            "hint": None,
+            "warnings": [],
+            "warning_details": [],
+            "fallback_context": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+
+    result = runner.invoke(
+        app,
+        ["download-subs", "https://example.com/video", "--config", str(config_path)],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["subtitle_only"] is True
+    assert captured["languages"] == ["all"]
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["command"] == "vlp download-subs"
+    assert manifest["artifacts"]["subtitle_srt"] == "video-subs-demo/subtitle.srt"
+    assert manifest["config_effective"]["download"]["subtitle_only"] is True
+    assert "subtitle download completed" in result.stdout

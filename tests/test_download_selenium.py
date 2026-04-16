@@ -37,6 +37,7 @@ from video_link_pipeline.download.service import (
     _retry_with_selenium_context,
     _set_failure_state,
     _set_prepared_fallback_context,
+    _validate_downloaded_files,
     DownloadPreparation,
     DownloadError,
     execute_download,
@@ -375,6 +376,7 @@ def test_prepare_retry_download_applies_probe_headers_and_metadata(monkeypatch, 
         languages=["zh"],
         quality="best",
         audio_only=False,
+        subtitle_only=False,
         result=result,
     )
 
@@ -423,6 +425,7 @@ def test_execute_primary_download_applies_metadata_and_artifacts(monkeypatch, tm
         languages=["zh"],
         quality="best",
         audio_only=False,
+        subtitle_only=False,
         cookies_from_browser=None,
         cookie_file=None,
         result=result,
@@ -697,6 +700,58 @@ def test_execute_download_returns_install_hint_when_selenium_extra_missing(monke
     assert "optional dependencies are not installed" in str(result["error"])
 
 
+def test_validate_downloaded_files_accepts_subtitle_only_outputs(tmp_path: Path) -> None:
+    job_dir = tmp_path / "subtitle-job"
+    job_dir.mkdir()
+    (job_dir / "subtitle.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+
+    _validate_downloaded_files(job_dir, audio_only=False, subtitle_only=True)
+
+
+def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "video-123-demo"
+    job_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service.probe_download",
+        lambda **_: DownloadPreparation(
+            url="https://example.com/video",
+            output_root=output_root,
+            output_dir=job_dir,
+            title_hint="demo",
+            cookie_source=CookieSource(),
+            ffmpeg_path=None,
+            ydl_options={"skip_download": True},
+        ),
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._execute_ydl_download",
+        lambda preparation: {
+            "video": None,
+            "audio_m4a": None,
+            "audio_mp3": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": "subtitle.srt",
+            "info_json": None,
+        },
+    )
+    (job_dir / "subtitle.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+
+    result = execute_download(
+        url="https://example.com/video",
+        output_dir=output_root,
+        subtitle_only=True,
+        selenium_mode="off",
+    )
+
+    assert result["success"] is True
+    assert result["video"] is None
+    assert result["subtitle"] == "video-123-demo/subtitle.srt"
+    assert result["subtitle_srt"] == "video-123-demo/subtitle.srt"
+    assert result["needs_whisper"] is False
+
+
 def test_continue_after_primary_failure_delegates_to_download_failure(monkeypatch, tmp_path: Path) -> None:
     result = new_download_result("https://example.com/video")
     result["error"] = "HTTP Error 403: Forbidden"
@@ -718,6 +773,7 @@ def test_continue_after_primary_failure_delegates_to_download_failure(monkeypatc
         languages=["zh"],
         quality="best",
         audio_only=False,
+        subtitle_only=False,
     )
 
     assert delegated == {"delegated": True}
@@ -913,12 +969,13 @@ def test_retry_with_selenium_context_uses_media_hint_headers(monkeypatch, tmp_pa
             site_name="example.com",
             extraction_source="jsonld:contentUrl",
         ),
-        output_dir=tmp_path,
-        languages=["zh"],
-        quality="best",
-        audio_only=False,
-        result={"success": False, "url": "https://example.com/video", "subtitle": None},
-    )
+            output_dir=tmp_path,
+            languages=["zh"],
+            quality="best",
+            audio_only=False,
+            subtitle_only=False,
+            result={"success": False, "url": "https://example.com/video", "subtitle": None},
+        )
 
     assert captured["probe_url"] == "https://cdn.example.com/media.m3u8"
     assert Path(str(captured["cookie_file"])) == tmp_path / "cookies.txt"
@@ -978,12 +1035,13 @@ def test_retry_with_selenium_context_marks_missing_explicit_media_hint(monkeypat
             site_name="example.com",
             extraction_source="dom",
         ),
-        output_dir=tmp_path,
-        languages=["zh"],
-        quality="best",
-        audio_only=False,
-        result={"success": False, "url": "https://example.com/video", "subtitle": None},
-    )
+            output_dir=tmp_path,
+            languages=["zh"],
+            quality="best",
+            audio_only=False,
+            subtitle_only=False,
+            result={"success": False, "url": "https://example.com/video", "subtitle": None},
+        )
 
     codes = [item["code"] for item in result["warning_details"]]
     assert "fallback_context_prepared" in codes
@@ -1032,12 +1090,13 @@ def test_retry_with_selenium_context_marks_structured_media_hint_missing(monkeyp
             site_name="example.com",
             extraction_source="window.__DATA__:playAddr",
         ),
-        output_dir=tmp_path,
-        languages=["zh"],
-        quality="best",
-        audio_only=False,
-        result={"success": False, "url": "https://example.com/video", "subtitle": None},
-    )
+            output_dir=tmp_path,
+            languages=["zh"],
+            quality="best",
+            audio_only=False,
+            subtitle_only=False,
+            result={"success": False, "url": "https://example.com/video", "subtitle": None},
+        )
 
     codes = [item["code"] for item in result["warning_details"]]
     assert "fallback_media_hint_missing_structured" in codes
