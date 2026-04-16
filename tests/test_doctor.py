@@ -321,7 +321,12 @@ def test_doctor_command_deduplicates_guidance_and_reference_codes(monkeypatch, t
 
     assert result.exit_code == 0
     assert result.stdout.count("ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail.") == 1
-    assert result.stdout.count("ffmpeg_unavailable fix: install ffmpeg and ensure it is available in PATH") == 1
+    assert (
+        result.stdout.count(
+            "ffmpeg_unavailable fix: Install system ffmpeg or keep `imageio-ffmpeg` available in the environment."
+        )
+        == 1
+    )
     known_codes_section = result.stdout.split("known diagnostic codes:", 1)[1]
     assert "ffmpeg_unavailable:" not in known_codes_section
 

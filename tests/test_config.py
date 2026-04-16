@@ -41,7 +41,9 @@ def test_load_config_applies_cli_env_yaml_precedence(monkeypatch, tmp_path: Path
     assert bundle.effective_config["whisper"]["device"] == "cuda"
 
 
-def test_load_config_merges_legacy_summary_api_keys_with_warning(tmp_path: Path) -> None:
+def test_load_config_merges_legacy_summary_api_keys_with_warning(monkeypatch, tmp_path: Path) -> None:
+    for env_name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(env_name, raising=False)
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
