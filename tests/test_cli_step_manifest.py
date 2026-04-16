@@ -190,3 +190,84 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
     assert manifest["execution"]["summarize"]["provider"] == "claude"
     assert manifest["execution"]["summarize"]["error_code"] is None
     assert manifest["execution"]["summarize"]["error"] is None
+
+
+def test_download_failure_still_writes_manifest_with_diagnostics(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "download-demo"
+    job_dir.mkdir(parents=True)
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path, output_root)
+
+    def fake_download(**_: object) -> dict[str, object]:
+        return {
+            "success": False,
+            "folder": "download-demo",
+            "video": None,
+            "audio": None,
+            "subtitle": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": False,
+            "fallback_status": "retry_failed",
+            "fallback_context": {
+                "resolved_url": "https://example.com/watch/demo",
+                "canonical_url": "https://example.com/watch/demo",
+                "media_hint_url": "https://example.com/watch/demo",
+                "site_name": "example.com",
+                "extraction_source": "window.__DATA__:playAddr",
+                "extraction_kind": "window_state",
+            },
+            "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
+            "error_stage": "fallback_retry",
+            "error": "retry download failed",
+            "hint": "structured cues still did not expose a direct media URL",
+            "warnings": [
+                "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+                "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+            ],
+            "warning_details": [
+                {
+                    "code": "primary_http_403",
+                    "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
+                    "stage": "primary_download",
+                },
+                {
+                    "code": "fallback_context_prepared",
+                    "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
+                    "stage": "fallback_prepare",
+                },
+                {
+                    "code": "fallback_media_hint_missing_structured",
+                    "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
+                    "stage": "fallback_prepare",
+                },
+            ],
+        }
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+
+    result = runner.invoke(app, ["download", "https://example.com/video", "--config", str(config_path)])
+
+    assert result.exit_code != 0
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["command"] == "vlp download"
+    assert manifest["input"]["url"] == "https://example.com/video"
+    download_execution = manifest["execution"]["download"]
+    assert download_execution["success"] is False
+    assert download_execution["fallback_status"] == "retry_failed"
+    assert download_execution["error_code"] == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert download_execution["error"] == "retry download failed"
+    assert download_execution["hint"] == "structured cues still did not expose a direct media URL"
+    assert download_execution["fallback_context"]["extraction_source"] == "window.__DATA__:playAddr"
+    assert download_execution["fallback_context"]["extraction_kind"] == "window_state"
+    codes = [item["code"] for item in download_execution["warning_details"]]
+    assert "primary_http_403" in codes
+    assert "fallback_context_prepared" in codes
+    assert "fallback_media_hint_missing_structured" in codes
+    assert result.exception is not None
+    assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
+    assert str(result.exception) == "retry download failed"
