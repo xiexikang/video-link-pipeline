@@ -253,6 +253,14 @@ def _find_existing_transcript(job_dir: Path) -> Path | None:
     return matches[0] if matches else None
 
 
+def _find_existing_summary(job_dir: Path) -> Path | None:
+    summary_path = job_dir / "summary.md"
+    if summary_path.exists():
+        return summary_path
+    matches = sorted(job_dir.glob("**/summary.md"))
+    return matches[0] if matches else None
+
+
 def _write_reused_transcript_manifest(
     *,
     transcript_path: Path,
@@ -291,6 +299,45 @@ def _write_reused_transcript_manifest(
                 "error_code": None,
                 "error": None,
                 "warnings": ["reused existing transcript"],
+            }
+        },
+    )
+    return manifest_path
+
+
+def _write_reused_summary_manifest(
+    *,
+    summary_path: Path,
+    effective_config: dict[str, Any],
+    output_root: Path,
+    transcript_path: Path,
+) -> Path | None:
+    if not summary_path.exists():
+        return None
+
+    manifest_path = summary_path.parent / "manifest.json"
+    config_snapshot = redact_config(effective_config)
+    summary_dir = summary_path.parent
+    keywords_file = summary_dir / "keywords.json"
+    artifacts = {
+        "summary_md": _relative_to_root(str(summary_path), output_root),
+        "keywords_json": _relative_to_root(str(keywords_file), output_root) if keywords_file.exists() else None,
+    }
+
+    upsert_manifest(
+        manifest_path,
+        command="vlp run",
+        input_data={"url": None, "input_path": str(transcript_path)},
+        config_effective=config_snapshot,
+        artifacts={key: value for key, value in artifacts.items() if value is not None},
+        execution={
+            "summarize": {
+                "success": True,
+                "provider": None,
+                "reused_existing": True,
+                "error_code": None,
+                "error": None,
+                "warnings": ["reused existing summary"],
             }
         },
     )
@@ -627,24 +674,34 @@ def run_command(
                 "summary step requires transcript.txt but no transcript was found",
                 error_code="INPUT_NOT_FOUND",
             )
-        summary_result = summarize_transcript(
-            transcript_path=transcript_path,
-            output_dir=None,
-            config=effective,
-        )
-        manifest_path = _write_summary_manifest(
-            result=summary_result,
-            effective_config=effective,
-            output_root=output_root,
-            transcript_path=transcript_path,
-        ) or manifest_path
-        if not summary_result["success"]:
-            raise VlpError(
-                str(summary_result["error"] or "summary generation failed"),
-                error_code="SUMMARY_FAILED",
+        summary_path = _find_existing_summary(job_dir)
+        if summary_path is not None:
+            manifest_path = _write_reused_summary_manifest(
+                summary_path=summary_path,
+                effective_config=effective,
+                output_root=output_root,
+                transcript_path=transcript_path,
+            ) or manifest_path
+            log.info(f"reusing existing summary={summary_path}")
+        else:
+            summary_result = summarize_transcript(
+                transcript_path=transcript_path,
+                output_dir=None,
+                config=effective,
             )
-        log.success("summary completed")
-        log.info(f"summary={summary_result['summary_file']}")
+            manifest_path = _write_summary_manifest(
+                result=summary_result,
+                effective_config=effective,
+                output_root=output_root,
+                transcript_path=transcript_path,
+            ) or manifest_path
+            if not summary_result["success"]:
+                raise VlpError(
+                    str(summary_result["error"] or "summary generation failed"),
+                    error_code="SUMMARY_FAILED",
+                )
+            log.success("summary completed")
+            log.info(f"summary={summary_result['summary_file']}")
 
     _finalize_run_manifest(manifest_path, effective_config=effective, url=url)
     log.success("pipeline completed")
