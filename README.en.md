@@ -516,6 +516,7 @@ The current `manifest.json` update behavior is also now locked by regression tes
 - `execution.download.error_code` falls back to `DOWNLOAD_FAILED` when the download result is unsuccessful and does not provide a more specific code
 - when `vlp run` completes after download only, the final `manifest.json` preserves the full `execution.download` diagnostics and does not synthesize `transcribe` or `summarize`
 - when `vlp run` finds an existing `transcript.txt` in the job directory, it reuses that transcript and records the skip via `execution.transcribe.reused_existing = true`
+- when `vlp run --do-summary` finds an existing `summary.md` in the job directory, it reuses that summary and records the skip via `execution.summarize.reused_existing = true`
 - when `vlp run` fails during transcription, the manifest preserves the successful download state and ends with the most recent command value `vlp transcribe`
 - when `vlp run` fails during summarization, the manifest preserves download success, transcription success, and summarization failure, ending with the most recent command value `vlp summarize`
 
@@ -526,6 +527,14 @@ When `vlp run` reuses an existing transcript, the common manifest fields that ge
 - `execution.transcribe.success = true`
 - `execution.transcribe.reused_existing = true`
 - `execution.transcribe.warnings = ["reused existing transcript"]`
+
+When `vlp run` reuses an existing summary, the common manifest fields that get filled are:
+
+- `artifacts.summary_md`
+- `artifacts.keywords_json` when that file already exists
+- `execution.summarize.success = true`
+- `execution.summarize.reused_existing = true`
+- `execution.summarize.warnings = ["reused existing summary"]`
 
 ## Compatibility Wrappers
 

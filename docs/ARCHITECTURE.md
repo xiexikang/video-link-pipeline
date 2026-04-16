@@ -376,6 +376,7 @@ Example:
     "summarize": {
       "success": true,
       "provider": "claude",
+      "reused_existing": false,
       "error_code": null,
       "error": null,
       "warnings": []
@@ -398,6 +399,7 @@ Example:
 - The same early-flush rule applies to single-step commands such as `vlp transcribe` and `vlp summarize` once their output path has been resolved
 - `vlp run` should preserve partial-success state instead of collapsing everything into a generic final status; the last successful or failed step remains visible through `command` and `execution.*`
 - If `vlp run` reuses an existing `transcript.txt`, manifest state should still include `execution.transcribe.success = true` plus a stable `execution.transcribe.reused_existing = true` marker
+- If `vlp run` reuses an existing `summary.md`, manifest state should still include `execution.summarize.success = true` plus a stable `execution.summarize.reused_existing = true` marker
 - If a failed download result omits a specific `error_code`, manifest serialization should normalize it to `DOWNLOAD_FAILED`
 
 ### Download Diagnostics Contract
