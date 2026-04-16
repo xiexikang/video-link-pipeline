@@ -106,6 +106,38 @@ vlp doctor
 
 ## 本地开发验证
 
+如果你在本地参与开发，推荐优先在仓库内使用 `.venv` 虚拟环境，而不是直接污染全局 Python。
+
+Windows / PowerShell 下推荐命令：
+
+```powershell
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .[dev]
+```
+
+如果你当前机器上暂时不适合完整安装 `.[dev]`，也可以先安装“最小可用测试环境”：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pip install pytest ruff build PyYAML python-dotenv typer requests yt-dlp imageio-ffmpeg anthropic openai tqdm
+& .\.venv\Scripts\python.exe -m pip install -e . --no-deps
+```
+
+后续命令也建议显式使用 `.venv` 里的解释器，例如：
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+& .\.venv\Scripts\python.exe -m ruff check .
+& .\.venv\Scripts\python.exe -m build
+```
+
+如果你已经激活了虚拟环境，再使用短命令也可以：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pytest -q
+```
+
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 
 ```bash
