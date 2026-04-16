@@ -30,6 +30,7 @@ from video_link_pipeline.download.service import (
     _classify_hint_warning,
     _classify_primary_warning,
     _missing_explicit_media_hint,
+    _missing_media_hint_warning_code,
     _origin_from_url,
     _record_fallback_prepare_warnings,
     _record_primary_download_warning,
@@ -220,6 +221,54 @@ def test_missing_explicit_media_hint_detects_page_url_fallbacks(tmp_path: Path) 
             extraction_source="jsonld",
         )
     ) is False
+
+
+def test_missing_media_hint_warning_code_distinguishes_signal_families(tmp_path: Path) -> None:
+    assert _missing_media_hint_warning_code(
+        SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="window.__DATA__:playAddr",
+        )
+    ) == "fallback_media_hint_missing_structured"
+    assert _missing_media_hint_warning_code(
+        SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="inline-html",
+        )
+    ) == "fallback_media_hint_missing_inline_only"
+    assert _missing_media_hint_warning_code(
+        SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="dom",
+        )
+    ) == "fallback_media_hint_missing_page_only"
 
 
 def test_apply_preparation_metadata_updates_core_result_fields(tmp_path: Path) -> None:
@@ -521,7 +570,7 @@ def test_record_fallback_prepare_warnings_adds_expected_codes(tmp_path: Path) ->
     _record_fallback_prepare_warnings(result, context)
 
     codes = [item["code"] for item in result["warning_details"]]
-    assert codes == ["fallback_context_prepared", "fallback_media_hint_missing"]
+    assert codes == ["fallback_context_prepared", "fallback_media_hint_missing_page_only"]
 
 
 def test_append_hint_warning_does_not_override_existing_hint_by_default() -> None:
@@ -938,7 +987,60 @@ def test_retry_with_selenium_context_marks_missing_explicit_media_hint(monkeypat
 
     codes = [item["code"] for item in result["warning_details"]]
     assert "fallback_context_prepared" in codes
-    assert "fallback_media_hint_missing" in codes
+    assert "fallback_media_hint_missing_page_only" in codes
+
+
+def test_retry_with_selenium_context_marks_structured_media_hint_missing(monkeypatch, tmp_path: Path) -> None:
+    class FakePreparation:
+        def __init__(self) -> None:
+            self.output_root = tmp_path
+            self.output_dir = tmp_path / "job"
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self.title_hint = "demo"
+            self.ffmpeg_path = "ffmpeg"
+            self.url = "https://example.com/watch/demo"
+            self.ydl_options = {}
+
+    monkeypatch.setattr("video_link_pipeline.download.service.probe_download", lambda **kwargs: FakePreparation())
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._execute_ydl_download",
+        lambda preparation: {
+            "video": "video.mp4",
+            "audio_mp3": None,
+            "audio_m4a": None,
+            "subtitle_vtt": None,
+            "subtitle_srt": None,
+            "info_json": None,
+        },
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._validate_downloaded_files",
+        lambda *args, **kwargs: None,
+    )
+
+    result = _retry_with_selenium_context(
+        context=SeleniumContext(
+            original_url="https://example.com/video",
+            resolved_url="https://example.com/watch/demo",
+            page_title="demo",
+            user_agent="mobile-ua",
+            referer="https://example.com/watch/demo",
+            cookie_file=tmp_path / "cookies.txt",
+            page_description="page description",
+            canonical_url="https://example.com/watch/demo",
+            media_hint_url="https://example.com/watch/demo",
+            site_name="example.com",
+            extraction_source="window.__DATA__:playAddr",
+        ),
+        output_dir=tmp_path,
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        result={"success": False, "url": "https://example.com/video", "subtitle": None},
+    )
+
+    codes = [item["code"] for item in result["warning_details"]]
+    assert "fallback_media_hint_missing_structured" in codes
 
 
 def test_execute_download_classifies_cookie_lock_warning(monkeypatch, tmp_path: Path) -> None:

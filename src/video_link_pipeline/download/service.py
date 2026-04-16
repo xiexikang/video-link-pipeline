@@ -281,6 +281,15 @@ def _missing_explicit_media_hint(context: SeleniumContext) -> bool:
     }
 
 
+def _missing_media_hint_warning_code(context: SeleniumContext) -> str:
+    extraction_kind = classify_extraction_kind(context.extraction_source)
+    if extraction_kind in {"meta", "jsonld", "next_data", "window_state"}:
+        return "fallback_media_hint_missing_structured"
+    if extraction_kind in {"inline_html", "inline_script"}:
+        return "fallback_media_hint_missing_inline_only"
+    return "fallback_media_hint_missing_page_only"
+
+
 def _record_fallback_prepare_warnings(result: dict[str, object], context: SeleniumContext) -> None:
     """Record warnings emitted while preparing fallback browser context."""
     extraction_kind = classify_extraction_kind(context.extraction_source)
@@ -297,8 +306,11 @@ def _record_fallback_prepare_warnings(result: dict[str, object], context: Seleni
     if _missing_explicit_media_hint(context):
         _append_warning(
             result,
-            code="fallback_media_hint_missing",
-            message="selenium fallback did not extract an explicit media URL and will retry with the resolved page URL",
+            code=_missing_media_hint_warning_code(context),
+            message=(
+                "selenium fallback did not extract an explicit media URL "
+                f"(kind={extraction_kind}) and will retry with the resolved page URL"
+            ),
             stage="fallback_prepare",
         )
 
