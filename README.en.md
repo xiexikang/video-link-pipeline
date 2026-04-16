@@ -106,6 +106,38 @@ vlp doctor
 
 ## Local Dev Checks
 
+If you are contributing locally, prefer using a repository-local `.venv` instead of installing into your global Python environment.
+
+Recommended commands on Windows / PowerShell:
+
+```powershell
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .[dev]
+```
+
+If the current machine is not a good fit for installing the full `.[dev]` extra yet, you can start with a minimal workable test environment:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pip install pytest ruff build PyYAML python-dotenv typer requests yt-dlp imageio-ffmpeg anthropic openai tqdm
+& .\.venv\Scripts\python.exe -m pip install -e . --no-deps
+```
+
+It is also recommended to keep using the `.venv` interpreter explicitly for validation commands:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+& .\.venv\Scripts\python.exe -m ruff check .
+& .\.venv\Scripts\python.exe -m build
+```
+
+If the virtual environment is already activated, the shorter form is also fine:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pytest -q
+```
+
 If you are contributing locally, install the dev extra:
 
 ```bash
