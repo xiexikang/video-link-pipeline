@@ -400,18 +400,10 @@ def extract_page_signals_from_html(
             pass
 
     for state_name in INLINE_STATE_SOURCES:
-        state_match = re.search(
-            rf"{re.escape(state_name)}\s*=\s*(\{{.*?\}})\s*;",
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        if not state_match:
+        parsed_state = _extract_inline_state_payload(html, state_name)
+        if parsed_state is None:
             continue
-        try:
-            parsed = json.loads(state_match.group(1).strip())
-        except json.JSONDecodeError:
-            continue
-        _collect_media_candidates(parsed, f"window.{state_name}", candidates)
+        _collect_media_candidates(parsed_state, f"window.{state_name}", candidates)
 
     for match in re.findall(r'https?://[^"\'\s]+(?:m3u8|mp4|mpd)[^"\'\s]*', html, flags=re.IGNORECASE):
         add_candidate(match, "inline-html")
@@ -470,6 +462,59 @@ def _collect_media_candidates(input_value: object, source: str, candidates: list
     for value in list(input_value.values())[:30]:
         if isinstance(value, (dict, list)):
             _collect_media_candidates(value, source, candidates, depth + 1)
+
+
+def _extract_inline_state_payload(html: str, state_name: str) -> object | None:
+    assignment_index = _find_inline_state_assignment(html, state_name)
+    if assignment_index < 0:
+        return None
+
+    payload_text = html[assignment_index:].lstrip()
+    if payload_text.startswith("JSON.parse"):
+        return _parse_json_parse_expression(payload_text)
+    if payload_text.startswith("{") or payload_text.startswith("["):
+        return _parse_json_literal_prefix(payload_text)
+    return None
+
+
+def _find_inline_state_assignment(html: str, state_name: str) -> int:
+    patterns = (
+        rf"window\.{re.escape(state_name)}\s*=",
+        rf"{re.escape(state_name)}\s*=",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, html, flags=re.IGNORECASE)
+        if match:
+            return match.end()
+    return -1
+
+
+def _parse_json_parse_expression(payload_text: str) -> object | None:
+    match = re.match(
+        r'JSON\.parse\(\s*(?P<quote>["\'])(?P<body>(?:\\.|(?! (?P=quote)).)*) (?P=quote)\s*\)',
+        payload_text,
+        flags=re.DOTALL | re.VERBOSE,
+    )
+    if not match:
+        return None
+
+    quote = str(match.group("quote"))
+    body = str(match.group("body"))
+    wrapped = f"{quote}{body}{quote}"
+    try:
+        decoded = json.loads(wrapped)
+        return json.loads(decoded)
+    except json.JSONDecodeError:
+        return None
+
+
+def _parse_json_literal_prefix(payload_text: str) -> object | None:
+    decoder = json.JSONDecoder()
+    try:
+        parsed, _ = decoder.raw_decode(payload_text)
+    except json.JSONDecodeError:
+        return None
+    return parsed
 
 
 def _derive_site_name(url: str) -> str:
