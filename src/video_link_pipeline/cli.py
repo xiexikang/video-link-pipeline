@@ -61,9 +61,9 @@ def _relative_to_root(path_value: str | None, output_root: Path) -> str | None:
         return None
     root_abs = (Path.cwd().resolve() / output_root).resolve()
     try:
-        return str(absolute_path.relative_to(root_abs))
+        return absolute_path.relative_to(root_abs).as_posix()
     except ValueError:
-        return str(absolute_path)
+        return absolute_path.as_posix()
 
 
 def _download_manifest_path(result: dict[str, object], output_root: Path) -> Path | None:

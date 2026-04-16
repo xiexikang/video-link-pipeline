@@ -56,7 +56,7 @@ def test_transcribe_failure_still_writes_manifest(monkeypatch, tmp_path: Path) -
     manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["command"] == "vlp transcribe"
     assert manifest["input"]["input_path"] == str(input_video)
-    assert manifest["artifacts"]["transcript_txt"] == "transcribe-demo/transcript.txt"
+    assert manifest["artifacts"]["transcript_txt"] == "transcript.txt"
     assert manifest["execution"]["transcribe"]["success"] is False
     assert manifest["execution"]["transcribe"]["engine"] == "faster"
     assert manifest["execution"]["transcribe"]["error_code"] == "TRANSCRIBE_FAILED"
@@ -103,10 +103,10 @@ def test_transcribe_success_writes_manifest(monkeypatch, tmp_path: Path) -> None
     manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["command"] == "vlp transcribe"
     assert manifest["input"]["input_path"] == str(input_video)
-    assert manifest["artifacts"]["transcript_txt"] == "transcribe-success-demo/transcript.txt"
-    assert manifest["artifacts"]["subtitle_srt"] == "transcribe-success-demo/subtitle_whisper.srt"
-    assert manifest["artifacts"]["subtitle_vtt"] == "transcribe-success-demo/subtitle_whisper.vtt"
-    assert manifest["artifacts"]["transcript_json"] == "transcribe-success-demo/transcript.json"
+    assert manifest["artifacts"]["transcript_txt"] == "transcript.txt"
+    assert manifest["artifacts"]["subtitle_srt"] == "subtitle_whisper.srt"
+    assert manifest["artifacts"]["subtitle_vtt"] == "subtitle_whisper.vtt"
+    assert manifest["artifacts"]["transcript_json"] == "transcript.json"
     assert manifest["execution"]["transcribe"]["success"] is True
     assert manifest["execution"]["transcribe"]["detected_language"] == "en"
     assert manifest["execution"]["transcribe"]["engine"] == "faster"
@@ -143,7 +143,7 @@ def test_summarize_failure_still_writes_manifest(monkeypatch, tmp_path: Path) ->
     manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["command"] == "vlp summarize"
     assert manifest["input"]["input_path"] == str(transcript)
-    assert manifest["artifacts"]["summary_md"] == "summary-demo/summary.md"
+    assert manifest["artifacts"]["summary_md"] == "summary.md"
     assert manifest["execution"]["summarize"]["success"] is False
     assert manifest["execution"]["summarize"]["provider"] == "claude"
     assert manifest["execution"]["summarize"]["error_code"] == "SUMMARY_FAILED"
@@ -184,8 +184,8 @@ def test_summarize_success_writes_manifest(monkeypatch, tmp_path: Path) -> None:
     manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["command"] == "vlp summarize"
     assert manifest["input"]["input_path"] == str(transcript)
-    assert manifest["artifacts"]["summary_md"] == "summary-success-demo/summary.md"
-    assert manifest["artifacts"]["keywords_json"] == "summary-success-demo/keywords.json"
+    assert manifest["artifacts"]["summary_md"] == "summary.md"
+    assert manifest["artifacts"]["keywords_json"] == "keywords.json"
     assert manifest["execution"]["summarize"]["success"] is True
     assert manifest["execution"]["summarize"]["provider"] == "claude"
     assert manifest["execution"]["summarize"]["error_code"] is None

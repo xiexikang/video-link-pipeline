@@ -13,6 +13,7 @@ yt-dlp>=2023.12.30
 typing-extensions>=4.8.0
 
 [dev]
+build>=1.2.0
 mypy>=1.8.0
 pre-commit>=3.6.0
 pytest>=8.0.0
