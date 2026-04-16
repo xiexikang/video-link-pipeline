@@ -1043,3 +1043,59 @@ def test_extract_page_signals_from_html_reads_meta_content_url() -> None:
 
     assert signals["media_hint_url"] == "https://cdn.example.com/from-meta.mp4"
     assert signals["extraction_source"] == "meta:itemprop:contentUrl"
+
+
+def test_extract_page_signals_from_html_reads_inline_nuxt_without_semicolon() -> None:
+    html = """
+    <html>
+      <head>
+        <script>
+          window.__NUXT__ = {
+            "state": {
+              "video": {
+                "dash": {
+                  "url": "https://cdn.example.com/from-nuxt.mpd"
+                }
+              }
+            }
+          }
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/nuxt",
+        canonical_url="https://example.com/watch/nuxt",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-nuxt.mpd"
+    assert signals["extraction_source"] == "window.__NUXT__:dash:url"
+
+
+def test_extract_page_signals_from_html_reads_inline_data_json_parse() -> None:
+    html = r"""
+    <html>
+      <head>
+        <script>
+          window.__DATA__ = JSON.parse("{\"detail\":{\"video\":{\"playAddr\":\"https://cdn.example.com/from-json-parse.m3u8\"}}}");
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    signals = extract_page_signals_from_html(
+        html=html,
+        resolved_url="https://example.com/watch/json-parse",
+        canonical_url="https://example.com/watch/json-parse",
+        description="demo page",
+        site_name="example.com",
+    )
+
+    assert signals["media_hint_url"] == "https://cdn.example.com/from-json-parse.m3u8"
+    assert signals["extraction_source"] == "window.__DATA__:playAddr"
