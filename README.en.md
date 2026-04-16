@@ -515,8 +515,17 @@ The current `manifest.json` update behavior is also now locked by regression tes
 - when `vlp summarize` fails but the summary job directory and `summary.md` path have already been resolved, the CLI still writes `manifest.json` before raising the final error
 - `execution.download.error_code` falls back to `DOWNLOAD_FAILED` when the download result is unsuccessful and does not provide a more specific code
 - when `vlp run` completes after download only, the final `manifest.json` preserves the full `execution.download` diagnostics and does not synthesize `transcribe` or `summarize`
+- when `vlp run` finds an existing `transcript.txt` in the job directory, it reuses that transcript and records the skip via `execution.transcribe.reused_existing = true`
 - when `vlp run` fails during transcription, the manifest preserves the successful download state and ends with the most recent command value `vlp transcribe`
 - when `vlp run` fails during summarization, the manifest preserves download success, transcription success, and summarization failure, ending with the most recent command value `vlp summarize`
+
+When `vlp run` reuses an existing transcript, the common manifest fields that get filled are:
+
+- `artifacts.transcript_txt`
+- `artifacts.subtitle_srt` / `artifacts.subtitle_vtt` / `artifacts.transcript_json` when those files already exist
+- `execution.transcribe.success = true`
+- `execution.transcribe.reused_existing = true`
+- `execution.transcribe.warnings = ["reused existing transcript"]`
 
 ## Compatibility Wrappers
 

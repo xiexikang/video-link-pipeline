@@ -515,8 +515,17 @@ CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `ma
 - `vlp summarize` 失败时，只要已经产出摘要目录与 `summary.md` 路径，仍会先写出 `manifest.json`，再由 CLI 抛错
 - `execution.download.error_code` 在下载失败但结果里未显式提供错误码时，会稳定回落成 `DOWNLOAD_FAILED`
 - `vlp run` 仅执行下载成功时，最终 `manifest.json` 会保留完整的 `execution.download` 诊断字段，不会凭空补出 `transcribe` 或 `summarize`
+- `vlp run` 如果发现 job 目录里已经存在 `transcript.txt`，会直接复用已有转录结果，并在 `execution.transcribe.reused_existing=true` 下记录这次跳过行为
 - `vlp run` 在转录失败时，manifest 会保留下载成功结果，并以最近一次写入命令 `vlp transcribe` 结束，方便定位失败阶段
 - `vlp run` 在摘要失败时，manifest 会同时保留下载成功、转录成功和摘要失败状态，并以最近一次写入命令 `vlp summarize` 结束
+
+当 `vlp run` 复用已有 transcript 时，常见补全字段包括：
+
+- `artifacts.transcript_txt`
+- `artifacts.subtitle_srt` / `artifacts.subtitle_vtt` / `artifacts.transcript_json`（如果这些文件已存在）
+- `execution.transcribe.success = true`
+- `execution.transcribe.reused_existing = true`
+- `execution.transcribe.warnings = ["reused existing transcript"]`
 
 ## 兼容脚本
 
