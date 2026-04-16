@@ -10,6 +10,7 @@ import typer
 from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
 from .doctor import doctor_guidance, doctor_reference_lines_for_remaining_codes, run_checks
+from .download.diagnostics import warning_code_remediation
 from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
 from .manifest import upsert_manifest
@@ -266,6 +267,16 @@ def _finalize_run_manifest(
         input_data={"url": url, "input_path": None},
         config_effective=redact_config(effective_config),
     )
+
+
+def _doctor_check_hint_to_render(check: object) -> str | None:
+    hint = str(getattr(check, "hint", "") or "").strip() or None
+    if hint is None:
+        return None
+    code = str(getattr(check, "code", "") or "").strip() or None
+    if code and hint == warning_code_remediation(code):
+        return None
+    return hint
 
 
 @app.command("download")
@@ -615,8 +626,9 @@ def doctor_command(config: Path = typer.Option(Path("config.yaml"), "--config", 
         else:
             has_failures = True
             log.warning(f"{check.name}: {check.detail}")
-        if check.hint:
-            log.info(f"hint: {check.hint}")
+        hint = _doctor_check_hint_to_render(check)
+        if hint:
+            log.info(f"hint: {hint}")
 
     sections = [
         ("runtime", "runtime:"),
