@@ -144,7 +144,7 @@ python -m pytest -q
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-最近一次本地基线结果为 `108 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
+最近一次本地基线结果为 `109 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
 
 如果你在本地参与开发，推荐直接安装 dev 依赖：
 

@@ -144,7 +144,7 @@ The repository has already been validated once against a full local pytest basel
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The latest local baseline result was `107 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
+The latest local baseline result was `109 passed`. If you continue changing the CLI, manifest flow, doctor output, or download fallback behavior, this is the recommended command to re-run first.
 
 If you are contributing locally, install the dev extra:
 
