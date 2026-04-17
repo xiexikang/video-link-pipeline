@@ -2,8 +2,6 @@
 
 `video-link-pipeline` 是一个面向本地命令行的全流程工具集，用来完成视频下载、转录、摘要生成和字幕格式转换。
 
-当前仓库正在从“多个独立脚本”迁移到“可发布的 Python 包 + 统一 CLI”的形态。现在推荐的主入口是 `vlp`，旧脚本 `download_video.py`、`parallel_transcribe.py`、`generate_summary.py`、`convert_subtitle.py` 仍然保留为兼容 wrapper。
-
 ## 当前能力
 
 - `vlp download <url>`：下载视频、音频、字幕，并标准化输出目录
@@ -343,6 +341,13 @@ vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser 
 # 如果你当前终端里的 `vlp` 还没更新到仓库最新代码，也可以直接在仓库里运行
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
+
+使用 `--cookies-from-browser chrome` 时请注意：
+
+- 这里的 `BV...` 只是示例占位符，实际运行时需要替换成真实视频链接
+- Chrome / Edge / Firefox 如果正在运行，浏览器 cookies 数据库可能被占用，导致命令行无法复制 cookies
+- Windows 下这个问题尤其常见；如果看到 `Could not copy Chrome cookie database`，先彻底关闭浏览器及其后台进程再重试
+- 如果你不想每次都关闭浏览器，可以先导出 `cookies.txt`，后续改用 `--cookie-file`
 
 ### 转录
 
