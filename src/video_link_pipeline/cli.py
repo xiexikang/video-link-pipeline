@@ -130,7 +130,7 @@ def _write_download_manifest(
                 "started_at_local": result.get("started_at_local"),
                 "finished_at": result.get("finished_at"),
                 "finished_at_local": result.get("finished_at_local"),
-                "elapsed_ms": result.get("elapsed_ms"),
+                "elapsed_seconds": result.get("elapsed_seconds"),
                 "warnings": list(result.get("warnings") or []),
                 "warning_details": list(result.get("warning_details") or []),
             }
@@ -322,7 +322,7 @@ def _write_transcribe_manifest(
                 "started_at_local": result.get("started_at_local"),
                 "finished_at": result.get("finished_at"),
                 "finished_at_local": result.get("finished_at_local"),
-                "elapsed_ms": result.get("elapsed_ms"),
+                "elapsed_seconds": result.get("elapsed_seconds"),
                 "warnings": [],
             }
         },
@@ -363,7 +363,7 @@ def _write_summary_manifest(
                 "started_at_local": result.get("started_at_local"),
                 "finished_at": result.get("finished_at"),
                 "finished_at_local": result.get("finished_at_local"),
-                "elapsed_ms": result.get("elapsed_ms"),
+                "elapsed_seconds": result.get("elapsed_seconds"),
                 "warnings": [],
             }
         },
@@ -428,7 +428,7 @@ def _write_reused_transcript_manifest(
                 "started_at_local": None,
                 "finished_at": None,
                 "finished_at_local": None,
-                "elapsed_ms": 0,
+                "elapsed_seconds": 0,
                 "warnings": ["reused existing transcript"],
             }
         },
@@ -472,7 +472,7 @@ def _write_reused_summary_manifest(
                 "started_at_local": None,
                 "finished_at": None,
                 "finished_at_local": None,
-                "elapsed_ms": 0,
+                "elapsed_seconds": 0,
                 "warnings": ["reused existing summary"],
             }
         },

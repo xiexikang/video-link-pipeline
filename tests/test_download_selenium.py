@@ -82,7 +82,7 @@ def test_new_download_result_provides_stable_default_shape() -> None:
     assert result["started_at_local"] is None
     assert result["finished_at"] is None
     assert result["finished_at_local"] is None
-    assert result["elapsed_ms"] is None
+    assert result["elapsed_seconds"] is None
 
 
 def test_classify_primary_warning_covers_common_cases() -> None:
@@ -777,8 +777,8 @@ def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_
     assert isinstance(result["started_at_local"], str)
     assert isinstance(result["finished_at"], str)
     assert isinstance(result["finished_at_local"], str)
-    assert isinstance(result["elapsed_ms"], int)
-    assert result["elapsed_ms"] >= 0
+    assert isinstance(result["elapsed_seconds"], float)
+    assert result["elapsed_seconds"] >= 0
 
 
 def test_continue_after_primary_failure_delegates_to_download_failure(monkeypatch, tmp_path: Path) -> None:

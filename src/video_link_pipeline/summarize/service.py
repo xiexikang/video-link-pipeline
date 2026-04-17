@@ -52,7 +52,7 @@ def _finalize_timing(
     result["started_at_local"] = started_at_local
     result["finished_at"] = _utc_now()
     result["finished_at_local"] = _local_now()
-    result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
+    result["elapsed_seconds"] = max(0.0, round(perf_counter() - started_perf, 3))
 
 
 def load_transcript(transcript_path: str | Path) -> str:
@@ -138,7 +138,7 @@ def summarize_transcript(
         "started_at_local": None,
         "finished_at": None,
         "finished_at_local": None,
-        "elapsed_ms": None,
+        "elapsed_seconds": None,
     }
 
     try:
