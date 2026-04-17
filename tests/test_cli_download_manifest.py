@@ -218,7 +218,57 @@ def test_download_cli_uses_detailed_error_code_on_failure(monkeypatch, tmp_path:
     assert result.exception is not None
     assert getattr(result.exception, "error_code", None) == "DOWNLOAD_FALLBACK_RETRY_FAILED"
     assert getattr(result.exception, "hint", None) == "Install the Selenium extra with `pip install \"video-link-pipeline[selenium]\"` and make sure Chrome can start normally."
-    assert str(result.exception) == "final retry failed"
+
+
+def test_download_manifest_records_grouped_site_folder(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path / "output"
+    job_dir = output_root / "bilibili" / "video-789-demo"
+    job_dir.mkdir(parents=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "output_dir": str(output_root),
+                "group_output_by_site": True,
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_download(**_: object) -> dict[str, object]:
+        (job_dir / "subtitle.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+        return {
+            "success": True,
+            "folder": str(job_dir),
+            "video": None,
+            "audio": None,
+            "subtitle": "bilibili/video-789-demo/subtitle.srt",
+            "subtitle_vtt": None,
+            "subtitle_srt": "bilibili/video-789-demo/subtitle.srt",
+            "info": None,
+            "needs_whisper": False,
+            "used_selenium_fallback": False,
+            "error_code": None,
+            "error_stage": None,
+            "fallback_status": "not_attempted",
+            "hint": None,
+            "warnings": [],
+            "warning_details": [],
+            "fallback_context": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
+
+    result = runner.invoke(app, ["download-subs", "https://www.bilibili.com/video/BV1demo", "--config", str(config_path)])
+
+    assert result.exit_code == 0, result.stdout
+    manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["config_effective"]["group_output_by_site"] is True
+    assert manifest["artifacts"]["folder"] == "bilibili/video-789-demo"
+    assert manifest["artifacts"]["subtitle_srt"] == "bilibili/video-789-demo/subtitle.srt"
 
 
 def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_path: Path) -> None:

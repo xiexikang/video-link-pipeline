@@ -42,6 +42,8 @@ from video_link_pipeline.download.service import (
     DownloadError,
     execute_download,
     new_download_result,
+    resolve_job_directory,
+    resolve_site_bucket,
 )
 from video_link_pipeline.errors import DependencyMissingError
 
@@ -83,6 +85,19 @@ def test_new_download_result_provides_stable_default_shape() -> None:
     assert result["finished_at"] is None
     assert result["finished_at_local"] is None
     assert result["elapsed_seconds"] is None
+
+
+def test_resolve_site_bucket_normalizes_common_platforms() -> None:
+    assert resolve_site_bucket("https://www.bilibili.com/video/BV1TYzsBLEds/") == "bilibili"
+    assert resolve_site_bucket("https://youtu.be/demo") == "youtube"
+    assert resolve_site_bucket("https://v.douyin.com/demo/") == "douyin"
+    assert resolve_site_bucket("https://sub.example.com/watch/1") == "sub.example.com"
+
+
+def test_resolve_job_directory_can_group_by_site_bucket(tmp_path: Path) -> None:
+    job_dir = resolve_job_directory(tmp_path, "Demo Title", "video-123", site_bucket="bilibili")
+
+    assert job_dir == tmp_path / "bilibili" / "video-123-Demo_Title"
 
 
 def test_classify_primary_warning_covers_common_cases() -> None:

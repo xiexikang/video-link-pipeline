@@ -14,6 +14,7 @@ from .errors import ConfigError
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "output_dir": "./output",
+    "group_output_by_site": False,
     "temp_dir": "./temp",
     "download": {
         "quality": "best",
@@ -55,6 +56,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 ENV_MAPPING: dict[str, tuple[str, ...]] = {
     "VLP_OUTPUT_DIR": ("output_dir",),
+    "VLP_GROUP_OUTPUT_BY_SITE": ("group_output_by_site",),
     "VLP_TEMP_DIR": ("temp_dir",),
     "VLP_DOWNLOAD_QUALITY": ("download", "quality"),
     "VLP_DOWNLOAD_FORMAT": ("download", "format"),

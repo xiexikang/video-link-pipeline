@@ -1,4 +1,5 @@
 output_dir: ./output
+group_output_by_site: false
 temp_dir: ./temp
 
 whisper:

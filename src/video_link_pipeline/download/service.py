@@ -29,6 +29,17 @@ from .selenium_fallback import (
     should_attempt_selenium_fallback,
 )
 
+SITE_BUCKET_ALIASES: dict[str, str] = {
+    "bilibili.com": "bilibili",
+    "youtube.com": "youtube",
+    "youtu.be": "youtube",
+    "douyin.com": "douyin",
+    "v.douyin.com": "douyin",
+    "tiktok.com": "tiktok",
+    "twitter.com": "x",
+    "x.com": "x",
+}
+
 
 @dataclass(slots=True)
 class DownloadPreparation:
@@ -394,6 +405,7 @@ def _prepare_retry_download(
     quality: str,
     audio_only: bool,
     subtitle_only: bool,
+    group_output_by_site: bool = False,
     result: dict[str, object],
 ) -> DownloadPreparation:
     """Probe and prepare the fallback retry download request."""
@@ -406,6 +418,7 @@ def _prepare_retry_download(
         audio_only=audio_only,
         subtitle_only=subtitle_only,
         cookie_file=context.cookie_file,
+        group_output_by_site=group_output_by_site,
     )
     preparation.output_dir.mkdir(parents=True, exist_ok=True)
     preparation.ydl_options["http_headers"] = _build_retry_headers(context)
@@ -508,9 +521,36 @@ def sanitize_filename(filename: str) -> str:
     return normalized.strip("_.") or "untitled"
 
 
-def resolve_job_directory(output_dir: str | Path, title: str, video_id: str | None = None) -> Path:
+def resolve_site_bucket(url: str | None) -> str | None:
+    """Resolve a stable output bucket from a media URL."""
+    if not url:
+        return None
+    hostname = urlparse(url).hostname
+    if not hostname:
+        return None
+    host = hostname.lower().strip(".")
+    while True:
+        labels = host.split(".")
+        if len(labels) <= 2 or labels[0] not in {"www", "m", "mobile"}:
+            break
+        host = ".".join(labels[1:])
+    for alias_host, bucket in SITE_BUCKET_ALIASES.items():
+        if host == alias_host or host.endswith(f".{alias_host}"):
+            return bucket
+    return sanitize_filename(host)
+
+
+def resolve_job_directory(
+    output_dir: str | Path,
+    title: str,
+    video_id: str | None = None,
+    *,
+    site_bucket: str | None = None,
+) -> Path:
     """Resolve the target job directory for downloaded artifacts."""
     root = Path(output_dir)
+    if site_bucket:
+        root = root / sanitize_filename(site_bucket)
     slug = sanitize_filename(title)
     folder_name = f"{video_id}-{slug}" if video_id else slug
     return root / folder_name
@@ -587,6 +627,7 @@ def prepare_download(
     subtitle_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
+    group_output_by_site: bool = False,
 ) -> DownloadPreparation:
     """Prepare derived paths and yt-dlp options for a download request."""
     normalized_languages = languages or ["zh", "en"]
@@ -600,7 +641,8 @@ def prepare_download(
     )
     ffmpeg_path = resolve_ffmpeg_executable()
     title = sanitize_filename(title_hint)
-    job_dir = resolve_job_directory(output_root, title)
+    site_bucket = resolve_site_bucket(url) if group_output_by_site else None
+    job_dir = resolve_job_directory(output_root, title, site_bucket=site_bucket)
     ydl_options = build_base_ydl_options(
         output_template=str(job_dir / f"{title}.%(ext)s"),
         languages=normalized_languages,
@@ -674,6 +716,7 @@ def probe_download(
     subtitle_only: bool = False,
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
+    group_output_by_site: bool = False,
 ) -> DownloadPreparation:
     """Probe the remote URL and prepare a concrete download job."""
     probe_prep = prepare_download(
@@ -686,6 +729,7 @@ def probe_download(
         subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
+        group_output_by_site=group_output_by_site,
     )
     probe_options = dict(probe_prep.ydl_options)
     probe_options["outtmpl"] = {"default": str(probe_prep.output_root / "%(title)s" / "%(title)s.%(ext)s")}
@@ -700,6 +744,13 @@ def probe_download(
     video_id = info.get("id")
     duration_seconds = info.get("duration")
     duration_human = info.get("duration_string") or _format_duration_human(duration_seconds)
+    site_bucket = resolve_site_bucket(url) if group_output_by_site else None
+    resolved_output_dir = resolve_job_directory(
+        output_dir,
+        raw_title,
+        video_id,
+        site_bucket=site_bucket,
+    )
     return prepare_download(
         url=url,
         output_dir=output_dir,
@@ -710,10 +761,11 @@ def probe_download(
         subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
+        group_output_by_site=group_output_by_site,
     ).__class__(
         url=url,
         output_root=Path(output_dir),
-        output_dir=resolve_job_directory(output_dir, raw_title, video_id),
+        output_dir=resolved_output_dir,
         title_hint=sanitize_filename(raw_title),
         cookie_source=probe_prep.cookie_source,
         ffmpeg_path=probe_prep.ffmpeg_path,
@@ -721,7 +773,7 @@ def probe_download(
         duration_seconds=duration_seconds if isinstance(duration_seconds, (int, float)) else None,
         duration_human=str(duration_human) if duration_human else None,
         ydl_options=build_base_ydl_options(
-            output_template=str(resolve_job_directory(output_dir, raw_title, video_id) / f"{sanitize_filename(raw_title)}.%(ext)s"),
+            output_template=str(resolved_output_dir / f"{sanitize_filename(raw_title)}.%(ext)s"),
             languages=languages or ["zh", "en"],
             quality=quality,
             audio_only=audio_only,
@@ -809,6 +861,7 @@ def _execute_primary_download(
     subtitle_only: bool,
     cookies_from_browser: str | None,
     cookie_file: str | Path | None,
+    group_output_by_site: bool = False,
     result: dict[str, object],
 ) -> dict[str, object]:
     """Run the primary yt-dlp path and populate the structured result on success."""
@@ -821,6 +874,7 @@ def _execute_primary_download(
         subtitle_only=subtitle_only,
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
+        group_output_by_site=group_output_by_site,
     )
     preparation.output_dir.mkdir(parents=True, exist_ok=True)
     _apply_preparation_metadata(result, preparation)
@@ -848,6 +902,7 @@ def _retry_with_selenium_context(
     quality: str,
     audio_only: bool,
     subtitle_only: bool,
+    group_output_by_site: bool = False,
     result: dict[str, object],
 ) -> dict[str, object]:
     preparation = _prepare_retry_download(
@@ -857,6 +912,7 @@ def _retry_with_selenium_context(
         quality=quality,
         audio_only=audio_only,
         subtitle_only=subtitle_only,
+        group_output_by_site=group_output_by_site,
         result=result,
     )
     _record_retry_context_state(result, context)
@@ -896,6 +952,7 @@ def _continue_after_primary_failure(
     quality: str,
     audio_only: bool,
     subtitle_only: bool,
+    group_output_by_site: bool = False,
 ) -> dict[str, object]:
     """Continue from a normalized primary failure into optional fallback handling."""
     return _handle_download_failure(
@@ -906,6 +963,7 @@ def _continue_after_primary_failure(
         quality=quality,
         audio_only=audio_only,
         subtitle_only=subtitle_only,
+        group_output_by_site=group_output_by_site,
     )
 
 
@@ -920,6 +978,7 @@ def execute_download(
     cookies_from_browser: str | None = None,
     cookie_file: str | Path | None = None,
     selenium_mode: str = "auto",
+    group_output_by_site: bool = False,
 ) -> dict[str, object]:
     """Run the primary yt-dlp download path and return a structured result."""
     result = new_download_result(url)
@@ -937,6 +996,7 @@ def execute_download(
             subtitle_only=subtitle_only,
             cookies_from_browser=cookies_from_browser,
             cookie_file=cookie_file,
+            group_output_by_site=group_output_by_site,
             result=result,
         )
     except Exception as exc:
@@ -949,6 +1009,7 @@ def execute_download(
             quality=quality,
             audio_only=audio_only,
             subtitle_only=subtitle_only,
+            group_output_by_site=group_output_by_site,
         )
     finally:
         _finalize_download_timing(
@@ -969,6 +1030,7 @@ def _handle_download_failure(
     quality: str,
     audio_only: bool,
     subtitle_only: bool,
+    group_output_by_site: bool = False,
 ) -> dict[str, object]:
     error_message = str(result.get("error") or "download failed")
     if not should_attempt_selenium_fallback(selenium_mode, error_message):
@@ -988,6 +1050,7 @@ def _handle_download_failure(
             quality=quality,
             audio_only=audio_only,
             subtitle_only=subtitle_only,
+            group_output_by_site=group_output_by_site,
             result=result,
         )
     except (DependencyMissingError, SeleniumFallbackError, DownloadError, Exception) as exc:
