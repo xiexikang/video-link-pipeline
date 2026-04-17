@@ -338,6 +338,7 @@ vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
 vlp download "https://..." --group-by-site
+vlp download "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --quality "bv*[height<=720]+ba/b[height<=720]/best"
 
 # Subtitle-only download, useful for sites like Bilibili where subtitles may be available even when media formats are restricted
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
@@ -353,6 +354,7 @@ When using `--cookies-from-browser chrome`, keep these points in mind:
 - if Chrome / Edge / Firefox is still running, the browser cookies database may be locked and cannot be copied by the CLI
 - this is especially common on Windows; if you see `Could not copy Chrome cookie database`, fully close the browser and any background processes before retrying
 - if you do not want to close the browser every time, export a `cookies.txt` file first and then use `--cookie-file`
+- for some Bilibili videos, even after login the default `best` selector may still target premium or otherwise restricted formats; in that case, use a more conservative selector such as `bv*[height<=720]+ba/b[height<=720]/best`
 
 ### Transcribe
 

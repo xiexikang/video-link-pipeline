@@ -338,6 +338,7 @@ vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
 vlp download "https://..." --group-by-site
+vlp download "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --quality "bv*[height<=720]+ba/b[height<=720]/best"
 
 # 只下载字幕和元数据，适合 B 站这类字幕可拿但视频格式可能受限的站点
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
@@ -353,6 +354,7 @@ python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..
 - Chrome / Edge / Firefox 如果正在运行，浏览器 cookies 数据库可能被占用，导致命令行无法复制 cookies
 - Windows 下这个问题尤其常见；如果看到 `Could not copy Chrome cookie database`，先彻底关闭浏览器及其后台进程再重试
 - 如果你不想每次都关闭浏览器，可以先导出 `cookies.txt`，后续改用 `--cookie-file`
+- B 站部分视频即使登录后，默认 `best` 也可能命中会员或受限格式；这时建议配合较保守的 `--quality` 选择器，例如 `bv*[height<=720]+ba/b[height<=720]/best`
 
 ### 转录
 
