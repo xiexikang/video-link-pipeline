@@ -264,6 +264,7 @@ python -m pytest tests/test_download_diagnostics.py
 
 ```yaml
 output_dir: ./output
+group_output_by_site: false
 temp_dir: ./temp
 
 download:
@@ -311,6 +312,7 @@ OPENAI_API_KEY=...
 GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=...
 VLP_OUTPUT_DIR=./output
+VLP_GROUP_OUTPUT_BY_SITE=false
 VLP_DOWNLOAD_COOKIES_FROM_BROWSER=chrome
 VLP_WHISPER_MODEL=small
 VLP_SUMMARY_PROVIDER=claude
@@ -321,6 +323,7 @@ VLP_SUMMARY_PROVIDER=claude
 - 旧配置 `summary.api_keys.*` 仍会被兼容读取，但会给出迁移 warning
 - `vlp doctor` 会提示当前 FFmpeg 来源和 Selenium/cookies 相关问题
 - `--selenium auto|on|off` 已接入 `download` 和 `run`
+- `group_output_by_site=true` 时，下载任务会按站点归类到子目录，例如 `output/bilibili/...`、`output/youtube/...`
 
 ## 使用方式
 
@@ -334,9 +337,11 @@ vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+vlp download "https://..." --group-by-site
 
 # 只下载字幕和元数据，适合 B 站这类字幕可拿但视频格式可能受限的站点
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --group-by-site
 
 # 如果你当前终端里的 `vlp` 还没更新到仓库最新代码，也可以直接在仓库里运行
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
@@ -389,6 +394,18 @@ vlp doctor --config ./config.yaml
 ## 输出约定
 
 `output_dir` 是输出根目录，每次任务会落到单独的 job 目录中。
+
+如果开启 `group_output_by_site` 或命令行传入 `--group-by-site`，下载输出会先按站点归类，再落到具体 job 目录，例如：
+
+```text
+output/
+├─ bilibili/
+│  └─ BVxxxx-demo-title/
+├─ youtube/
+│  └─ demo-title/
+└─ douyin/
+   └─ demo-title/
+```
 
 典型输出如下：
 

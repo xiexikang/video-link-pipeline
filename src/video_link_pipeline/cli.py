@@ -147,9 +147,11 @@ def _download_overrides(
     cookies_from_browser: str | None,
     cookie_file: Path | None,
     selenium: str | None,
+    group_by_site: bool | None,
 ) -> dict[str, Any]:
     return {
         "output_dir": str(output_dir) if output_dir else None,
+        "group_output_by_site": group_by_site,
         "download": {
             "subtitles_langs": sub_lang,
             "quality": quality,
@@ -173,6 +175,7 @@ def _run_download_command(
     cookies_from_browser: str | None,
     cookie_file: Path | None,
     selenium: str | None,
+    group_by_site: bool | None,
     config: Path,
 ) -> None:
     bundle = _command_context(
@@ -184,6 +187,7 @@ def _run_download_command(
             cookies_from_browser=cookies_from_browser,
             cookie_file=cookie_file,
             selenium=selenium,
+            group_by_site=group_by_site,
         ),
     )
     effective = bundle.effective_config
@@ -202,6 +206,7 @@ def _run_download_command(
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
         selenium_mode=download_config["selenium"],
+        group_output_by_site=bool(effective.get("group_output_by_site", False)),
     )
 
     manifest_path = _write_download_manifest(
@@ -516,6 +521,7 @@ def download_command(
     cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
+    group_by_site: bool | None = typer.Option(None, "--group-by-site/--no-group-by-site", help="Group downloaded jobs under a site bucket such as bilibili/ or youtube/."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     _run_download_command(
@@ -530,6 +536,7 @@ def download_command(
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
         selenium=selenium,
+        group_by_site=group_by_site,
         config=config,
     )
 
@@ -543,6 +550,7 @@ def download_subtitles_command(
     cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
+    group_by_site: bool | None = typer.Option(None, "--group-by-site/--no-group-by-site", help="Group downloaded jobs under a site bucket such as bilibili/ or youtube/."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     _run_download_command(
@@ -557,6 +565,7 @@ def download_subtitles_command(
         cookies_from_browser=cookies_from_browser,
         cookie_file=cookie_file,
         selenium=selenium,
+        group_by_site=group_by_site,
         config=config,
     )
 
@@ -700,10 +709,12 @@ def run_command(
     cookies_from_browser: str | None = typer.Option(None, "--cookies-from-browser", help="Browser name for yt-dlp cookies."),
     cookie_file: Path | None = typer.Option(None, "--cookie-file", help="Netscape cookie file path."),
     selenium: str | None = typer.Option(None, "--selenium", help="Selenium fallback mode: auto/on/off."),
+    group_by_site: bool | None = typer.Option(None, "--group-by-site/--no-group-by-site", help="Group downloaded jobs under a site bucket such as bilibili/ or youtube/."),
     config: Path = typer.Option(Path("config.yaml"), "--config", help="Path to config YAML."),
 ) -> None:
     overrides = {
         "output_dir": str(output_dir) if output_dir else None,
+        "group_output_by_site": group_by_site,
         "download": {
             "subtitles_langs": sub_lang,
             "quality": quality,
@@ -731,6 +742,7 @@ def run_command(
         cookies_from_browser=download_config.get("cookies_from_browser"),
         cookie_file=download_config.get("cookie_file"),
         selenium_mode=download_config["selenium"],
+        group_output_by_site=bool(effective.get("group_output_by_site", False)),
     )
     manifest_path = _write_download_manifest(
         command_name="vlp download",

@@ -91,3 +91,13 @@ def test_load_config_rejects_invalid_enum(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="invalid value for download.selenium"):
         load_config(config_path=config_path)
+
+
+def test_load_config_supports_group_output_by_site_from_env(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("output_dir: ./output\n", encoding="utf-8")
+    monkeypatch.setenv("VLP_GROUP_OUTPUT_BY_SITE", "true")
+
+    bundle = load_config(config_path=config_path)
+
+    assert bundle.effective_config["group_output_by_site"] is True

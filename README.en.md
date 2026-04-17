@@ -264,6 +264,7 @@ Example config:
 
 ```yaml
 output_dir: ./output
+group_output_by_site: false
 temp_dir: ./temp
 
 download:
@@ -311,6 +312,7 @@ OPENAI_API_KEY=...
 GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=...
 VLP_OUTPUT_DIR=./output
+VLP_GROUP_OUTPUT_BY_SITE=false
 VLP_DOWNLOAD_COOKIES_FROM_BROWSER=chrome
 VLP_WHISPER_MODEL=small
 VLP_SUMMARY_PROVIDER=claude
@@ -321,6 +323,7 @@ Notes:
 - Legacy `summary.api_keys.*` is still read for compatibility, but it now emits a migration warning
 - `vlp doctor` reports the selected FFmpeg source and highlights Selenium/cookies issues
 - `--selenium auto|on|off` is wired into `download` and `run`
+- when `group_output_by_site=true`, download jobs are grouped into site buckets such as `output/bilibili/...` or `output/youtube/...`
 
 ## Usage
 
@@ -334,9 +337,11 @@ vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+vlp download "https://..." --group-by-site
 
 # Subtitle-only download, useful for sites like Bilibili where subtitles may be available even when media formats are restricted
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --group-by-site
 
 # If your current `vlp` command is not picking up the latest repository code yet, run the module entry point directly
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
@@ -389,6 +394,18 @@ vlp doctor --config ./config.yaml
 ## Output Contract
 
 `output_dir` is the output root. Each task writes into its own job directory.
+
+If `group_output_by_site` is enabled, or you pass `--group-by-site`, download output is grouped into a site bucket before the concrete job directory, for example:
+
+```text
+output/
+├─ bilibili/
+│  └─ BVxxxx-demo-title/
+├─ youtube/
+│  └─ demo-title/
+└─ douyin/
+   └─ demo-title/
+```
 
 A typical output tree looks like this:
 
