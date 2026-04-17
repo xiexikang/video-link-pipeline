@@ -86,7 +86,7 @@ def new_download_result(url: str) -> dict[str, object]:
         "started_at_local": None,
         "finished_at": None,
         "finished_at_local": None,
-        "elapsed_ms": None,
+        "elapsed_seconds": None,
         "error_code": None,
         "error_stage": None,
         "fallback_status": "not_attempted",
@@ -133,7 +133,7 @@ def _finalize_download_timing(
     result["started_at_local"] = started_at_local
     result["finished_at"] = _utc_now()
     result["finished_at_local"] = _local_now()
-    result["elapsed_ms"] = max(0, int(round((perf_counter() - started_perf) * 1000)))
+    result["elapsed_seconds"] = max(0.0, round(perf_counter() - started_perf, 3))
 
 
 def _warning_details(result: dict[str, object]) -> list[dict[str, str]]:

@@ -40,7 +40,7 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
             "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:05Z",
             "finished_at_local": "2026-04-16T18:00:05+08:00",
-            "elapsed_ms": 5000,
+            "elapsed_seconds": 5.0,
             "error_code": None,
             "error_stage": None,
             "fallback_status": "succeeded",
@@ -90,7 +90,7 @@ def test_download_manifest_records_fallback_diagnostics(monkeypatch, tmp_path: P
     assert download_execution["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert download_execution["finished_at"] == "2026-04-16T10:00:05Z"
     assert download_execution["finished_at_local"] == "2026-04-16T18:00:05+08:00"
-    assert download_execution["elapsed_ms"] == 5000
+    assert download_execution["elapsed_seconds"] == 5.0
     assert download_execution["warning_details"][0]["code"] == "primary_http_403"
     assert download_execution["warning_details"][1]["code"] == "fallback_context_prepared"
     assert download_execution["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
@@ -249,7 +249,7 @@ def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_pa
             "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:07Z",
             "finished_at_local": "2026-04-16T18:00:07+08:00",
-            "elapsed_ms": 7000,
+            "elapsed_seconds": 7.0,
             "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
             "error_stage": "fallback_retry",
             "fallback_status": "retry_failed",
@@ -302,7 +302,7 @@ def test_download_failure_with_job_dir_still_writes_manifest(monkeypatch, tmp_pa
     assert download_execution["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert download_execution["finished_at"] == "2026-04-16T10:00:07Z"
     assert download_execution["finished_at_local"] == "2026-04-16T18:00:07+08:00"
-    assert download_execution["elapsed_ms"] == 7000
+    assert download_execution["elapsed_seconds"] == 7.0
     assert download_execution["warning_details"][0]["code"] == "primary_http_403"
     assert download_execution["warning_details"][1]["code"] == "fallback_retry_hint"
     assert download_execution["fallback_context"]["media_hint_url"] == "https://cdn.example.com/media.m3u8"
@@ -396,7 +396,7 @@ def test_download_subs_command_records_subtitle_only_manifest(monkeypatch, tmp_p
             "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:03Z",
             "finished_at_local": "2026-04-16T18:00:03+08:00",
-            "elapsed_ms": 3000,
+            "elapsed_seconds": 3.0,
             "error_code": None,
             "error_stage": None,
             "fallback_status": "not_attempted",
@@ -425,5 +425,5 @@ def test_download_subs_command_records_subtitle_only_manifest(monkeypatch, tmp_p
     assert manifest["config_effective"]["download"]["subtitle_only"] is True
     assert manifest["execution"]["download"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
     assert manifest["execution"]["download"]["finished_at_local"] == "2026-04-16T18:00:03+08:00"
-    assert manifest["execution"]["download"]["elapsed_ms"] == 3000
+    assert manifest["execution"]["download"]["elapsed_seconds"] == 3.0
     assert "subtitle download completed" in result.stdout

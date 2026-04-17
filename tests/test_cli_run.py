@@ -70,7 +70,7 @@ def test_run_command_do_summary_also_generates_transcript(monkeypatch, tmp_path:
             "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:03Z",
             "finished_at_local": "2026-04-16T18:00:03+08:00",
-            "elapsed_ms": 3000,
+            "elapsed_seconds": 3.0,
         }
 
     def fake_summarize(**_: object) -> dict[str, object]:
@@ -89,7 +89,7 @@ def test_run_command_do_summary_also_generates_transcript(monkeypatch, tmp_path:
             "started_at_local": "2026-04-16T18:00:03+08:00",
             "finished_at": "2026-04-16T10:00:04Z",
             "finished_at_local": "2026-04-16T18:00:04+08:00",
-            "elapsed_ms": 1000,
+            "elapsed_seconds": 1.0,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
@@ -105,9 +105,9 @@ def test_run_command_do_summary_also_generates_transcript(monkeypatch, tmp_path:
     assert manifest["execution"]["download"]["success"] is True
     assert manifest["execution"]["transcribe"]["success"] is True
     assert manifest["execution"]["summarize"]["success"] is True
-    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 3000
+    assert manifest["execution"]["transcribe"]["elapsed_seconds"] == 3.0
     assert manifest["execution"]["transcribe"]["started_at_local"] == "2026-04-16T18:00:00+08:00"
-    assert manifest["execution"]["summarize"]["elapsed_ms"] == 1000
+    assert manifest["execution"]["summarize"]["elapsed_seconds"] == 1.0
     assert manifest["execution"]["summarize"]["finished_at_local"] == "2026-04-16T18:00:04+08:00"
     assert manifest["artifacts"]["folder"] == "video-123-demo"
     assert manifest["artifacts"]["transcript_txt"] == "video-123-demo/transcript.txt"
@@ -161,7 +161,7 @@ def test_run_command_missing_subtitles_triggers_transcribe(monkeypatch, tmp_path
             "started_at_local": "2026-04-16T18:00:00+08:00",
             "finished_at": "2026-04-16T10:00:02Z",
             "finished_at_local": "2026-04-16T18:00:02+08:00",
-            "elapsed_ms": 2000,
+            "elapsed_seconds": 2.0,
         }
 
     monkeypatch.setattr("video_link_pipeline.cli.execute_download", fake_download)
@@ -174,7 +174,7 @@ def test_run_command_missing_subtitles_triggers_transcribe(monkeypatch, tmp_path
     assert calls["transcribe"] == 1
     assert manifest["command"] == "vlp run"
     assert manifest["execution"]["transcribe"]["success"] is True
-    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 2000
+    assert manifest["execution"]["transcribe"]["elapsed_seconds"] == 2.0
     assert manifest["execution"]["transcribe"]["finished_at_local"] == "2026-04-16T18:00:02+08:00"
     assert manifest["artifacts"]["transcript_txt"] == "video-456-demo/transcript.txt"
 
@@ -513,7 +513,7 @@ def test_run_command_reuses_existing_transcript_and_records_manifest_state(monke
     assert manifest["execution"]["transcribe"]["reused_existing"] is True
     assert manifest["execution"]["transcribe"]["engine"] is None
     assert manifest["execution"]["transcribe"]["started_at_local"] is None
-    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 0
+    assert manifest["execution"]["transcribe"]["elapsed_seconds"] == 0
     assert manifest["execution"]["transcribe"]["warnings"] == ["reused existing transcript"]
     assert "summarize" not in manifest["execution"]
 
@@ -577,7 +577,7 @@ def test_run_command_do_summary_reuses_existing_transcript_without_retranscribin
     assert manifest["execution"]["transcribe"]["success"] is True
     assert manifest["execution"]["transcribe"]["reused_existing"] is True
     assert manifest["execution"]["transcribe"]["finished_at_local"] is None
-    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 0
+    assert manifest["execution"]["transcribe"]["elapsed_seconds"] == 0
     assert manifest["execution"]["summarize"]["success"] is True
 
 
@@ -632,7 +632,7 @@ def test_run_command_do_summary_reuses_existing_summary_without_resummarizing(mo
     assert manifest["execution"]["summarize"]["success"] is True
     assert manifest["execution"]["summarize"]["reused_existing"] is True
     assert manifest["execution"]["summarize"]["started_at_local"] is None
-    assert manifest["execution"]["summarize"]["elapsed_ms"] == 0
+    assert manifest["execution"]["summarize"]["elapsed_seconds"] == 0
     assert manifest["execution"]["summarize"]["provider"] is None
     assert manifest["execution"]["summarize"]["warnings"] == ["reused existing summary"]
 
@@ -696,10 +696,10 @@ def test_run_command_do_summary_reuses_existing_transcript_and_summary(monkeypat
     assert manifest["execution"]["transcribe"]["success"] is True
     assert manifest["execution"]["transcribe"]["reused_existing"] is True
     assert manifest["execution"]["transcribe"]["started_at_local"] is None
-    assert manifest["execution"]["transcribe"]["elapsed_ms"] == 0
+    assert manifest["execution"]["transcribe"]["elapsed_seconds"] == 0
     assert manifest["execution"]["transcribe"]["warnings"] == ["reused existing transcript"]
     assert manifest["execution"]["summarize"]["success"] is True
     assert manifest["execution"]["summarize"]["reused_existing"] is True
     assert manifest["execution"]["summarize"]["finished_at_local"] is None
-    assert manifest["execution"]["summarize"]["elapsed_ms"] == 0
+    assert manifest["execution"]["summarize"]["elapsed_seconds"] == 0
     assert manifest["execution"]["summarize"]["warnings"] == ["reused existing summary"]
