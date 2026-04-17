@@ -249,6 +249,35 @@ Common local troubleshooting tips:
 - `scripts/check.ps1` also prints the active `sys.executable` at startup so the script is easier to debug in multi-Python environments
 - If you only want to verify that recent documentation or test edits did not introduce syntax issues, `python -m compileall src tests` is the lowest-cost check available right now
 
+## Skill Sync
+
+If you also want to maintain the repository's Codex skill and install it into the globally discoverable skills directory, the repository now provides a helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+```
+
+By default, this script does three things:
+
+- copies `skills/video-link-pipeline` from the repository into the global directory `~/.codex/skills/video-link-pipeline`
+- if `CODEX_HOME` is set, uses `$CODEX_HOME/skills/video-link-pipeline` instead
+- runs `quick_validate.py` after copying so the installed skill is validated automatically
+
+The recommended workflow is:
+
+- edit only the repository copy under `skills/video-link-pipeline`
+- run `scripts/sync-skill.ps1` after changes to publish the latest version into the global skills directory
+- add `-SkipValidate` only when you explicitly want to skip post-sync validation
+
+Examples:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1 -SkipValidate
+```
+
+This keeps the repository version and the globally installed version from drifting apart, and makes skill testing more reliable because new sessions will see the latest synced copy.
+
 ## Configuration
 
 The default config file is `config.yaml` in the repository root.

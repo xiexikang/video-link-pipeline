@@ -249,6 +249,35 @@ python -m pytest tests/test_download_diagnostics.py
 - `scripts/check.ps1` 开头也会打印当前 `sys.executable`，便于快速确认脚本实际使用的是哪个 Python
 - 如果你只是想确认最近文档/测试改动没有引入语法问题，`python -m compileall src tests` 是当前成本最低的一步
 
+## Skill 同步
+
+如果你希望把仓库里的 Codex skill 一起维护并安装到全局可发现目录，当前仓库已经提供了一个同步脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+```
+
+这个脚本默认会做三件事：
+
+- 把仓库内的 `skills/video-link-pipeline` 同步到全局目录 `~/.codex/skills/video-link-pipeline`
+- 如果设置了 `CODEX_HOME`，则优先同步到 `$CODEX_HOME/skills/video-link-pipeline`
+- 同步完成后自动运行 `quick_validate.py` 校验安装后的 skill
+
+当前推荐约定是：
+
+- 只编辑仓库内的 `skills/video-link-pipeline`
+- 改完后再运行 `scripts/sync-skill.ps1` 发布到全局目录
+- 如果你只想同步不校验，可以追加 `-SkipValidate`
+
+例如：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1 -SkipValidate
+```
+
+这样可以避免“仓库版本”和“全局安装版本”长期漂移，后续测试 skill 时也能始终基于最新内容。
+
 ## 配置
 
 默认配置文件是项目根目录下的 `config.yaml`。

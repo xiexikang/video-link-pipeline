@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Link Pipeline"
+  short_description: "Run and troubleshoot the local video content pipeline"
+  default_prompt: "Use $video-link-pipeline to choose commands, inspect manifests, diagnose failures, and operate the local CLI workflow."
