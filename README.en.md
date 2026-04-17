@@ -2,8 +2,6 @@
 
 `video-link-pipeline` is a local CLI toolchain for video downloading, transcription, summarization, and subtitle conversion.
 
-This repository is being migrated from a collection of standalone scripts to a publishable Python package with a unified CLI. The recommended entry point is now `vlp`. Legacy scripts such as `download_video.py`, `parallel_transcribe.py`, `generate_summary.py`, and `convert_subtitle.py` are still kept as compatibility wrappers.
-
 ## Current Commands
 
 - `vlp download <url>`: download video, audio, and subtitles into a normalized job folder
@@ -343,6 +341,13 @@ vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser 
 # If your current `vlp` command is not picking up the latest repository code yet, run the module entry point directly
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
+
+When using `--cookies-from-browser chrome`, keep these points in mind:
+
+- `BV...` is only a placeholder in the example and must be replaced with a real video URL
+- if Chrome / Edge / Firefox is still running, the browser cookies database may be locked and cannot be copied by the CLI
+- this is especially common on Windows; if you see `Could not copy Chrome cookie database`, fully close the browser and any background processes before retrying
+- if you do not want to close the browser every time, export a `cookies.txt` file first and then use `--cookie-file`
 
 ### Transcribe
 
