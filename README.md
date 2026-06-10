@@ -12,6 +12,106 @@
 - `vlp run <url>`：串联下载、转录、摘要，并持续更新 `manifest.json`
 - `vlp doctor`：检查 Python、FFmpeg、Selenium extra、cookies 配置
 
+## 项目架构
+
+### 模块结构
+
+源码主目录为 `src/video_link_pipeline/`，按 CLI 编排层、服务层和基础设施分层组织：
+
+```text
+src/video_link_pipeline/
+├── cli.py              # 统一 CLI 编排层（Typer 命令入口）
+├── config.py           # 配置加载与合并
+├── manifest.py         # 任务状态契约（manifest.json）
+├── doctor.py           # 环境/配置诊断
+├── errors.py           # 统一错误类型
+├── download/           # 下载（yt-dlp + Selenium 回退）
+│   ├── service.py      # 下载主流程与 fallback 编排
+│   ├── selenium_fallback.py
+│   ├── diagnostics.py  # 共享诊断码与 warning 分类
+│   ├── cookies.py
+│   └── yt_dlp_backend.py
+├── transcribe/         # 转录（faster-whisper / openai-whisper）
+│   ├── service.py
+│   ├── faster_engine.py
+│   ├── openai_engine.py
+│   └── ffmpeg.py
+├── summarize/          # 摘要（Claude / OpenAI / Gemini）
+│   ├── service.py
+│   └── providers.py
+└── subtitles/          # 字幕格式转换
+    └── convert.py
+
+根目录 legacy 脚本（向后兼容，仍复用包内服务层）:
+  download_video.py · parallel_transcribe.py · generate_summary.py · convert_subtitle.py
+```
+
+各层职责如下：
+
+| 层级 | 主要模块 | 职责 |
+| --- | --- | --- |
+| CLI 编排 | `cli.py` | 解析命令、加载配置、调用服务层、写入 `manifest.json` |
+| 服务层 | `download/`、`transcribe/`、`summarize/`、`subtitles/` | 下载、转录、摘要、字幕转换等业务逻辑 |
+| 基础设施 | `config.py`、`manifest.py`、`doctor.py`、`errors.py` | 配置合并、任务状态、环境诊断、统一错误类型 |
+
+复杂度较高的模块主要是 `download/service.py`（下载主流程与 Selenium fallback）和 `cli.py`（命令编排与 manifest 增量写入）。推荐新用法统一走 `vlp` CLI；根目录 legacy 脚本仅作兼容入口。
+
+### 架构总结
+
+整体是一个本地命令行内容处理流水线：`cli.py` 作为编排枢纽，调用各服务模块完成下载、转录、摘要等步骤，并通过 `manifest.json` 持续记录任务状态。
+
+```mermaid
+flowchart TB
+    subgraph CLI["CLI 层 (cli.py)"]
+        run[run_command]
+        dl[download_command]
+        tr[transcribe_command]
+        sm[summarize_command]
+        doc[doctor_command]
+    end
+
+    subgraph Services["服务层"]
+        ED[execute_download]
+        TP[transcribe_path]
+        ST[summarize_transcript]
+        CV[convert_subtitle]
+    end
+
+    subgraph Infra["基础设施"]
+        CFG[load_config / ConfigBundle]
+        MF[Manifest / upsert_manifest]
+        ERR[VlpError 体系]
+    end
+
+    subgraph Backends["后端实现"]
+        YTDLP[yt-dlp]
+        SEL[Selenium fallback]
+        FF[ffmpeg]
+        WH[faster/openai whisper]
+        LLM[Claude/OpenAI/Gemini]
+    end
+
+    run --> ED --> YTDLP
+    ED --> SEL
+    run --> TP --> FF --> WH
+    run --> ST --> LLM
+    dl --> ED
+    tr --> TP
+    sm --> ST
+
+    CLI --> CFG
+    CLI --> MF
+    Services --> ERR
+```
+
+关键调用关系：
+
+- **`vlp run`**：`execute_download` → `transcribe_path` → `summarize_transcript`，各阶段通过 `upsert_manifest` 增量写入 `manifest.json`；若 job 目录已有 `transcript.txt` 或 `summary.md`，会先复用已有产物。
+- **下载链路**：主路径走 `yt-dlp`；失败后按 `should_attempt_selenium_fallback` 判断是否进入 Selenium 浏览器兜底，再携带浏览器上下文重试下载。
+- **转录链路**：`resolve_input_media` → `extract_audio_from_video`（ffmpeg）→ 选择 faster/openai whisper 引擎 → 生成 SRT/VTT。
+- **摘要链路**：`load_transcript` → 按配置选择 Claude / OpenAI / Gemini provider。
+- **配置入口**：所有 CLI 命令经 `_command_context` 调用 `load_config`，优先级为 CLI 参数 > 环境变量 / `.env` > `config.yaml` > 内置默认值。
+
 ## 安装
 
 要求：

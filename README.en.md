@@ -12,6 +12,106 @@
 - `vlp run <url>`: orchestrate download, transcription, and summary while updating `manifest.json`
 - `vlp doctor`: inspect Python, FFmpeg, Selenium extra, and cookies-related setup
 
+## Project Architecture
+
+### Module Structure
+
+The main source tree lives under `src/video_link_pipeline/` and is organized into a CLI orchestration layer, service modules, and shared infrastructure:
+
+```text
+src/video_link_pipeline/
+├── cli.py              # Unified CLI orchestration layer (Typer command entrypoints)
+├── config.py           # Config loading and merging
+├── manifest.py         # Job state contract (manifest.json)
+├── doctor.py           # Environment and config diagnostics
+├── errors.py           # Shared error types
+├── download/           # Downloading (yt-dlp + Selenium fallback)
+│   ├── service.py      # Main download flow and fallback orchestration
+│   ├── selenium_fallback.py
+│   ├── diagnostics.py  # Shared diagnostic codes and warning taxonomy
+│   ├── cookies.py
+│   └── yt_dlp_backend.py
+├── transcribe/         # Transcription (faster-whisper / openai-whisper)
+│   ├── service.py
+│   ├── faster_engine.py
+│   ├── openai_engine.py
+│   └── ffmpeg.py
+├── summarize/          # Summarization (Claude / OpenAI / Gemini)
+│   ├── service.py
+│   └── providers.py
+└── subtitles/          # Subtitle format conversion
+    └── convert.py
+
+Root-level legacy scripts (backward compatibility, still reuse package services):
+  download_video.py · parallel_transcribe.py · generate_summary.py · convert_subtitle.py
+```
+
+Layer responsibilities:
+
+| Layer | Main modules | Responsibility |
+| --- | --- | --- |
+| CLI orchestration | `cli.py` | Parse commands, load config, call services, write `manifest.json` |
+| Services | `download/`, `transcribe/`, `summarize/`, `subtitles/` | Download, transcription, summarization, and subtitle conversion logic |
+| Infrastructure | `config.py`, `manifest.py`, `doctor.py`, `errors.py` | Config merging, job state, environment checks, shared error types |
+
+The most complex modules are `download/service.py` (download flow and Selenium fallback) and `cli.py` (command orchestration and incremental manifest writes). New usage should go through the `vlp` CLI; root-level legacy scripts remain compatibility entrypoints only.
+
+### Architecture Summary
+
+Overall, this is a local CLI content-processing pipeline: `cli.py` acts as the orchestration hub, calling service modules for download, transcription, and summarization while continuously updating `manifest.json`.
+
+```mermaid
+flowchart TB
+    subgraph CLI["CLI layer (cli.py)"]
+        run[run_command]
+        dl[download_command]
+        tr[transcribe_command]
+        sm[summarize_command]
+        doc[doctor_command]
+    end
+
+    subgraph Services["Service layer"]
+        ED[execute_download]
+        TP[transcribe_path]
+        ST[summarize_transcript]
+        CV[convert_subtitle]
+    end
+
+    subgraph Infra["Infrastructure"]
+        CFG[load_config / ConfigBundle]
+        MF[Manifest / upsert_manifest]
+        ERR[VlpError hierarchy]
+    end
+
+    subgraph Backends["Backends"]
+        YTDLP[yt-dlp]
+        SEL[Selenium fallback]
+        FF[ffmpeg]
+        WH[faster/openai whisper]
+        LLM[Claude/OpenAI/Gemini]
+    end
+
+    run --> ED --> YTDLP
+    ED --> SEL
+    run --> TP --> FF --> WH
+    run --> ST --> LLM
+    dl --> ED
+    tr --> TP
+    sm --> ST
+
+    CLI --> CFG
+    CLI --> MF
+    Services --> ERR
+```
+
+Key call relationships:
+
+- **`vlp run`**: `execute_download` → `transcribe_path` → `summarize_transcript`, with each stage incrementally writing to `manifest.json` via `upsert_manifest`; if `transcript.txt` or `summary.md` already exists in the job folder, existing artifacts are reused first.
+- **Download path**: primary flow uses `yt-dlp`; on failure, `should_attempt_selenium_fallback` decides whether to enter Selenium browser fallback and retry with browser context.
+- **Transcription path**: `resolve_input_media` → `extract_audio_from_video` (ffmpeg) → choose faster/openai whisper engine → generate SRT/VTT.
+- **Summarization path**: `load_transcript` → select Claude / OpenAI / Gemini provider from config.
+- **Config entrypoint**: all CLI commands go through `_command_context`, which calls `load_config` with precedence CLI args > env vars / `.env` > `config.yaml` > built-in defaults.
+
 ## Installation
 
 Requirements:
