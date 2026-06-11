@@ -115,6 +115,16 @@ def test_preferred_warning_hint_returns_none_when_no_shared_or_fallback_hint() -
     assert hint is None
 
 
+def test_warning_code_description_and_remediation_for_subtitle_cc_unavailable() -> None:
+    description = warning_code_description("subtitle_cc_unavailable")
+    remediation = warning_code_remediation("subtitle_cc_unavailable")
+
+    assert description is not None
+    assert "danmaku" in description
+    assert remediation is not None
+    assert "--do-transcribe" in remediation
+
+
 def test_doctor_guidance_deduplicates_codes_and_skips_missing_metadata() -> None:
     checks = [
         DoctorCheck(

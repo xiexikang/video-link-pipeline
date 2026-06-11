@@ -21,6 +21,7 @@ WARNING_CODES = {
     "fallback_prepare_hint": "Additional hint emitted when fallback browser-context preparation fails.",
     "fallback_retry_hint": "Additional hint emitted when fallback retry fails.",
     "fallback_retry_unhandled_exception": "Fallback retry raised an unclassified exception.",
+    "subtitle_cc_unavailable": "Only danmaku (bullet-comment) subtitles are available; no CC/AI captions in vtt/srt format.",
 }
 
 WARNING_REMEDIATIONS = {
@@ -55,6 +56,10 @@ WARNING_REMEDIATIONS = {
     ),
     "fallback_media_hint_missing_structured": (
         "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic."
+    ),
+    "subtitle_cc_unavailable": (
+        "This video has no CC subtitles (vtt/srt); only danmaku tracks were found. "
+        "Use `vlp run <url> --do-transcribe` or `vlp transcribe` on downloaded audio/video to extract speech text."
     ),
 }
 

@@ -266,6 +266,8 @@ def _classify_warning_message(message: str, *, default_code: str) -> str:
         return "browser_driver_unavailable"
     if "ffmpeg" in lowered:
         return "ffmpeg_unavailable"
+    if "danmaku" in lowered or "no cc subtitle" in lowered:
+        return "subtitle_cc_unavailable"
     return default_code
 
 
@@ -307,6 +309,15 @@ def _record_primary_exception(result: dict[str, object], exc: Exception) -> None
     """Normalize an exception raised on the primary path into result state."""
     if isinstance(exc, DownloadError):
         _record_primary_failure(result, exc.message)
+        warning_code = _classify_primary_warning(exc.message)
+        if warning_code != "primary_download_failed" or exc.hint:
+            _append_warning_with_hint(
+                result,
+                code=warning_code,
+                message=exc.message,
+                stage="primary_download",
+                fallback_hint=exc.hint,
+            )
         return
     _record_primary_failure(result, str(exc))
 
@@ -784,6 +795,15 @@ def probe_download(
     )
 
 
+def _find_danmaku_subtitle_files(job_dir: Path) -> list[Path]:
+    """Return danmaku subtitle files that yt-dlp may write when no vtt/srt CC tracks exist."""
+    return [
+        path
+        for path in job_dir.iterdir()
+        if path.is_file() and "danmaku" in path.name.lower() and path.suffix.lower() == ".xml"
+    ]
+
+
 def _validate_downloaded_files(job_dir: Path, *, audio_only: bool, subtitle_only: bool) -> None:
     files = list(job_dir.glob("*"))
     if not files:
@@ -799,6 +819,11 @@ def _validate_downloaded_files(job_dir: Path, *, audio_only: bool, subtitle_only
         subtitle_candidates = [job_dir / "subtitle.vtt", job_dir / "subtitle.srt"]
         if any(path.exists() for path in subtitle_candidates):
             return
+        if _find_danmaku_subtitle_files(job_dir):
+            raise DownloadError(
+                "download failed: no CC subtitle (vtt/srt) was produced; only danmaku subtitles are available",
+                hint=warning_code_remediation("subtitle_cc_unavailable"),
+            )
         raise DownloadError("download failed: no subtitle artifact was produced")
 
     video_file = job_dir / "video.mp4"

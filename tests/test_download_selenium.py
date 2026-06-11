@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from video_link_pipeline.download.cookies import CookieSource
 from video_link_pipeline.download.selenium_fallback import (
     SeleniumContext,
@@ -739,6 +741,37 @@ def test_validate_downloaded_files_accepts_subtitle_only_outputs(tmp_path: Path)
     (job_dir / "subtitle.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
 
     _validate_downloaded_files(job_dir, audio_only=False, subtitle_only=True)
+
+
+def test_validate_downloaded_files_reports_danmaku_only_subtitles(tmp_path: Path) -> None:
+    job_dir = tmp_path / "danmaku-job"
+    job_dir.mkdir()
+    (job_dir / "demo.danmaku.xml").write_text("<i></i>", encoding="utf-8")
+    (job_dir / "info.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(DownloadError) as exc_info:
+        _validate_downloaded_files(job_dir, audio_only=False, subtitle_only=True)
+
+    assert "only danmaku subtitles are available" in exc_info.value.message
+    assert exc_info.value.hint is not None
+    assert "--do-transcribe" in exc_info.value.hint
+
+
+def test_record_primary_exception_promotes_danmaku_subtitle_hint() -> None:
+    from video_link_pipeline.download.diagnostics import warning_code_remediation
+
+    result: dict[str, object] = {"warnings": [], "warning_details": []}
+    exc = DownloadError(
+        "download failed: no CC subtitle (vtt/srt) was produced; only danmaku subtitles are available",
+        hint=warning_code_remediation("subtitle_cc_unavailable"),
+    )
+
+    _record_primary_exception(result, exc)
+
+    assert result["error_code"] == "DOWNLOAD_PRIMARY_FAILED"
+    assert result["hint"] is not None
+    assert "--do-transcribe" in str(result["hint"])
+    assert result["warning_details"][0]["code"] == "subtitle_cc_unavailable"
 
 
 def test_execute_download_subtitle_only_succeeds_without_video(monkeypatch, tmp_path: Path) -> None:
