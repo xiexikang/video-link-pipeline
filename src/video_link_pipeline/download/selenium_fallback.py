@@ -592,7 +592,14 @@ def _write_netscape_cookies(cookie_file: Path, cookies: list[dict[str, object]])
         include_subdomains = "TRUE" if domain.startswith(".") else "FALSE"
         path = str(cookie.get("path") or "/")
         secure = "TRUE" if bool(cookie.get("secure")) else "FALSE"
-        expiry = str(int(cookie.get("expiry", 0) or 0))
+        expiry = str(
+            int(
+                cookie.get("expiry")
+                or cookie.get("expires")
+                or cookie.get("expiration")
+                or 0
+            )
+        )
         name = str(cookie.get("name") or "")
         value = str(cookie.get("value") or "")
         lines.append("\t".join([domain, include_subdomains, path, secure, expiry, name, value]))

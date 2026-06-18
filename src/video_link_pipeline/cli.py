@@ -10,6 +10,7 @@ import typer
 from . import logging as log
 from .config import ConfigBundle, load_config, redact_config
 from .doctor import doctor_guidance, doctor_reference_lines_for_remaining_codes, run_checks
+from .download.cookie_login import export_cookies_after_login
 from .download.diagnostics import warning_code_remediation
 from .download.service import execute_download
 from .errors import InputNotFoundError, NotImplementedVlpError, VlpError
@@ -696,6 +697,39 @@ def convert_subtitle_command(
         log.info(str(result["message"]))
     log.info(f"input={result['input_path']} ({result['input_format']})")
     log.info(f"output={result['output_path']} ({result['output_format']})")
+
+
+@app.command("cookies-login")
+def cookies_login_command(
+    url: str = typer.Argument(..., help="Page URL for the site that requires login."),
+    cookie_file: Path = typer.Option(
+        Path("cookies.txt"),
+        "--cookie-file",
+        help="Path to write Netscape-format cookies.txt.",
+    ),
+    profile_dir: Path = typer.Option(
+        Path("temp/cookie-login-profile"),
+        "--profile-dir",
+        help="Dedicated Selenium Chrome profile directory.",
+    ),
+) -> None:
+    """Open a separate browser for login and export reusable cookies.txt."""
+    log.info("opening an isolated browser window for login")
+    log.info("your normal browser can stay open; this flow does not read its locked cookie database")
+
+    def wait_for_login(message: str) -> None:
+        log.info(message)
+        input()
+
+    path = export_cookies_after_login(
+        url=url,
+        cookie_file=cookie_file,
+        profile_dir=profile_dir,
+        prompt=wait_for_login,
+    )
+    log.success("cookies exported")
+    log.info(f"cookie_file={path}")
+    log.info(f"next download: vlp download <url> --cookie-file {path}")
 
 
 @app.command("run")

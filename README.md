@@ -10,6 +10,7 @@
 - `vlp summarize <transcript.txt>`：调用大模型生成 `summary.md` 和 `keywords.json`
 - `vlp convert-subtitle <file-or-dir>`：在 `srt` 和 `vtt` 之间转换
 - `vlp run <url>`：串联下载、转录、摘要，并持续更新 `manifest.json`
+- `vlp cookies-login <url>`：打开独立浏览器窗口完成登录，并导出可复用的 `cookies.txt`
 - `vlp doctor`：检查 Python、FFmpeg、Selenium extra、cookies 配置
 
 ## 项目架构
@@ -482,6 +483,19 @@ python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..
 - Chrome / Edge / Firefox 如果正在运行，浏览器 cookies 数据库可能被占用，导致命令行无法复制 cookies
 - Windows 下这个问题尤其常见；如果看到 `Could not copy Chrome cookie database`，先彻底关闭浏览器及其后台进程再重试
 - 如果你不想每次都关闭浏览器，可以先导出 `cookies.txt`，后续改用 `--cookie-file`
+
+更推荐的免关浏览器方案是使用独立登录窗口导出 cookie 文件：
+
+```bash
+# 打开一个独立 Chrome 窗口，登录完成后回到终端按回车
+vlp cookies-login "https://www.bilibili.com" --cookie-file ./cookies.txt
+
+# 后续下载直接复用 cookies.txt，不需要关闭日常浏览器
+vlp download "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt
+vlp run "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt --do-summary
+```
+
+`cookies-login` 使用独立 Selenium Chrome profile，不会读取你日常浏览器正在锁定的 cookies 数据库。默认 profile 目录是 `temp/cookie-login-profile`，以后再次执行同一命令时通常会保留这个独立登录态，像一只专门负责拿钥匙的小浏览器。
 
 ### 转录
 
