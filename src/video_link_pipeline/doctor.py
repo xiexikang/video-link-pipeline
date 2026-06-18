@@ -17,6 +17,7 @@ from .download.diagnostics import (
     warning_reference_lines,
 )
 from .download.cookies import KNOWN_BROWSERS
+from .download.service import _resolve_node_executable
 from .transcribe.ffmpeg import resolve_ffmpeg_executable
 
 
@@ -51,6 +52,7 @@ def run_checks(config: dict[str, Any] | None = None) -> list[DoctorCheck]:
         _check_python_runtime(),
         _check_python_executable(),
         _check_ffmpeg(),
+        _check_node_runtime(),
         _check_selenium_extra(),
     ]
     checks.extend(_check_cookie_configuration(effective_config))
@@ -137,6 +139,24 @@ def _check_ffmpeg() -> DoctorCheck:
         detail=detail,
         section="download_prerequisites",
         code="ffmpeg_unavailable",
+    )
+
+
+def _check_node_runtime() -> DoctorCheck:
+    node_path = _resolve_node_executable()
+    if node_path is None:
+        return DoctorCheck(
+            name="node_runtime",
+            ok=False,
+            detail="node.js was not found in PATH or common install locations",
+            section="download_prerequisites",
+            hint="install Node.js or ensure fnm/system node is available to the web API process",
+        )
+    return DoctorCheck(
+        name="node_runtime",
+        ok=True,
+        detail=f"node.js available for YouTube JS challenges: {Path(node_path).resolve()}",
+        section="download_prerequisites",
     )
 
 

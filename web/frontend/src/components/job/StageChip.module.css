@@ -1,0 +1,39 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--vlp-border);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.idle {
+  color: var(--vlp-text-muted);
+  border-color: var(--vlp-idle);
+}
+
+.running {
+  color: var(--vlp-accent);
+  border-color: var(--vlp-accent);
+}
+
+.done {
+  color: var(--vlp-ok);
+  border-color: color-mix(in srgb, var(--vlp-ok) 40%, var(--vlp-border));
+}
+
+.failed {
+  color: var(--vlp-fail);
+  border-color: color-mix(in srgb, var(--vlp-fail) 40%, var(--vlp-border));
+}
+
+.skipped {
+  color: var(--vlp-skip);
+  border-style: dashed;
+}
+
+.icon {
+  font-size: 0.7rem;
+}

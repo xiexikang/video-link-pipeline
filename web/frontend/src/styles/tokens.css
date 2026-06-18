@@ -1,0 +1,46 @@
+:root {
+  --vlp-base: #13151a;
+  --vlp-surface: #1c1f26;
+  --vlp-elevated: #252932;
+  --vlp-border: #343a46;
+  --vlp-text: #e8eaed;
+  --vlp-text-secondary: #9aa3b2;
+  --vlp-text-muted: #6b7280;
+  --vlp-accent: #e5a023;
+  --vlp-ok: #4ec9a0;
+  --vlp-fail: #e06c75;
+  --vlp-skip: #5c6370;
+  --vlp-idle: #3d4450;
+
+  --font-display: "Syne", system-ui, sans-serif;
+  --font-body: "Source Sans 3", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --page-px: 16px;
+  --page-pb: calc(72px + env(safe-area-inset-bottom, 0px));
+  --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+  --sidebar-w: 0px;
+  --touch-min: 44px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --page-px: 20px;
+    --page-pb: 24px;
+    --tabbar-h: 0px;
+    --sidebar-w: 64px;
+    --touch-min: 40px;
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --page-px: 24px;
+    --sidebar-w: 200px;
+    --touch-min: 36px;
+  }
+}

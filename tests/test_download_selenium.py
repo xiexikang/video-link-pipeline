@@ -40,6 +40,7 @@ from video_link_pipeline.download.service import (
     _set_failure_state,
     _set_prepared_fallback_context,
     _validate_downloaded_files,
+    build_base_ydl_options,
     DownloadPreparation,
     DownloadError,
     execute_download,
@@ -87,6 +88,93 @@ def test_new_download_result_provides_stable_default_shape() -> None:
     assert result["finished_at"] is None
     assert result["finished_at_local"] is None
     assert result["elapsed_seconds"] is None
+
+
+def test_build_base_ydl_options_maps_best_to_merge_format() -> None:
+    cookie_source = CookieSource(browser=None, cookie_file=None)
+    with_ffmpeg = build_base_ydl_options(
+        output_template="out/%(title)s.%(ext)s",
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        subtitle_only=False,
+        ffmpeg_path="ffmpeg",
+        cookie_source=cookie_source,
+    )
+    without_ffmpeg = build_base_ydl_options(
+        output_template="out/%(title)s.%(ext)s",
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        subtitle_only=False,
+        ffmpeg_path=None,
+        cookie_source=cookie_source,
+    )
+
+    assert with_ffmpeg["format"] == "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo+bestaudio/best"
+    assert with_ffmpeg["merge_output_format"] == "mp4"
+    assert without_ffmpeg["format"] == "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    assert "merge_output_format" not in without_ffmpeg
+
+
+def test_build_base_ydl_options_enables_youtube_js_challenge_when_node_available(
+    monkeypatch,
+) -> None:
+    cookie_source = CookieSource(browser=None, cookie_file=None)
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._node_executable_usable",
+        lambda _path: True,
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._iter_node_candidates",
+        lambda: ["/usr/bin/node"],
+    )
+
+    options = build_base_ydl_options(
+        output_template="out/%(title)s.%(ext)s",
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        subtitle_only=False,
+        ffmpeg_path="ffmpeg",
+        cookie_source=cookie_source,
+    )
+
+    assert options["js_runtimes"] == {"node": {"path": "/usr/bin/node"}}
+    assert options["remote_components"] == ("ejs:github",)
+
+
+def test_build_base_ydl_options_falls_back_to_fnm_node_without_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    cookie_source = CookieSource(browser=None, cookie_file=None)
+    fnm_root = tmp_path / "fnm_multishells" / "shell-1"
+    fnm_root.mkdir(parents=True)
+    node_exe = fnm_root / "node.exe"
+    node_exe.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._iter_node_candidates",
+        lambda: [str(node_exe)],
+    )
+    monkeypatch.setattr(
+        "video_link_pipeline.download.service._node_executable_usable",
+        lambda _path: True,
+    )
+
+    options = build_base_ydl_options(
+        output_template="out/%(title)s.%(ext)s",
+        languages=["zh"],
+        quality="best",
+        audio_only=False,
+        subtitle_only=False,
+        ffmpeg_path="ffmpeg",
+        cookie_source=cookie_source,
+    )
+
+    assert options["js_runtimes"] == {"node": {"path": str(node_exe)}}
+    assert options["remote_components"] == ("ejs:github",)
 
 
 def test_resolve_site_bucket_normalizes_common_platforms() -> None:

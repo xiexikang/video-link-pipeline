@@ -1,0 +1,35 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch-min);
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.primary {
+  background: var(--vlp-accent);
+  color: #13151a;
+}
+
+.primary:hover {
+  filter: brightness(1.05);
+}
+
+.ghost {
+  background: transparent;
+  border-color: var(--vlp-border);
+  color: var(--vlp-text);
+}
+
+.ghost:hover {
+  background: var(--vlp-elevated);
+}
+
+.fullWidth {
+  width: 100%;
+}

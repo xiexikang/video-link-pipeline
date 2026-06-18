@@ -27,23 +27,26 @@ Requires-Dist: requests>=2.31.0
 Requires-Dist: tqdm>=4.66.0
 Requires-Dist: typer<1.0,>=0.12
 Requires-Dist: typing-extensions>=4.8.0; python_version < "3.11"
-Requires-Dist: yt-dlp>=2023.12.30
+Requires-Dist: yt-dlp>=2026.3.1
 Provides-Extra: selenium
 Requires-Dist: selenium>=4.0.0; extra == "selenium"
 Requires-Dist: webdriver-manager>=4.0.0; extra == "selenium"
+Provides-Extra: web
+Requires-Dist: fastapi>=0.110; extra == "web"
+Requires-Dist: uvicorn[standard]>=0.27; extra == "web"
+Requires-Dist: python-multipart>=0.0.9; extra == "web"
 Provides-Extra: dev
 Requires-Dist: build>=1.2.0; extra == "dev"
 Requires-Dist: mypy>=1.8.0; extra == "dev"
 Requires-Dist: pre-commit>=3.6.0; extra == "dev"
 Requires-Dist: pytest>=8.0.0; extra == "dev"
 Requires-Dist: ruff>=0.3.0; extra == "dev"
+Requires-Dist: httpx>=0.27.0; extra == "dev"
 Dynamic: license-file
 
 # video-link-pipeline
 
 `video-link-pipeline` 是一个面向本地命令行的全流程工具集，用来完成视频下载、转录、摘要生成和字幕格式转换。
-
-当前仓库正在从“多个独立脚本”迁移到“可发布的 Python 包 + 统一 CLI”的形态。现在推荐的主入口是 `vlp`，旧脚本 `download_video.py`、`parallel_transcribe.py`、`generate_summary.py`、`convert_subtitle.py` 仍然保留为兼容 wrapper。
 
 ## 当前能力
 
@@ -54,6 +57,106 @@ Dynamic: license-file
 - `vlp convert-subtitle <file-or-dir>`：在 `srt` 和 `vtt` 之间转换
 - `vlp run <url>`：串联下载、转录、摘要，并持续更新 `manifest.json`
 - `vlp doctor`：检查 Python、FFmpeg、Selenium extra、cookies 配置
+
+## 项目架构
+
+### 模块结构
+
+源码主目录为 `src/video_link_pipeline/`，按 CLI 编排层、服务层和基础设施分层组织：
+
+```text
+src/video_link_pipeline/
+├── cli.py              # 统一 CLI 编排层（Typer 命令入口）
+├── config.py           # 配置加载与合并
+├── manifest.py         # 任务状态契约（manifest.json）
+├── doctor.py           # 环境/配置诊断
+├── errors.py           # 统一错误类型
+├── download/           # 下载（yt-dlp + Selenium 回退）
+│   ├── service.py      # 下载主流程与 fallback 编排
+│   ├── selenium_fallback.py
+│   ├── diagnostics.py  # 共享诊断码与 warning 分类
+│   ├── cookies.py
+│   └── yt_dlp_backend.py
+├── transcribe/         # 转录（faster-whisper / openai-whisper）
+│   ├── service.py
+│   ├── faster_engine.py
+│   ├── openai_engine.py
+│   └── ffmpeg.py
+├── summarize/          # 摘要（Claude / OpenAI / Gemini）
+│   ├── service.py
+│   └── providers.py
+└── subtitles/          # 字幕格式转换
+    └── convert.py
+
+根目录 legacy 脚本（向后兼容，仍复用包内服务层）:
+  download_video.py · parallel_transcribe.py · generate_summary.py · convert_subtitle.py
+```
+
+各层职责如下：
+
+| 层级 | 主要模块 | 职责 |
+| --- | --- | --- |
+| CLI 编排 | `cli.py` | 解析命令、加载配置、调用服务层、写入 `manifest.json` |
+| 服务层 | `download/`、`transcribe/`、`summarize/`、`subtitles/` | 下载、转录、摘要、字幕转换等业务逻辑 |
+| 基础设施 | `config.py`、`manifest.py`、`doctor.py`、`errors.py` | 配置合并、任务状态、环境诊断、统一错误类型 |
+
+复杂度较高的模块主要是 `download/service.py`（下载主流程与 Selenium fallback）和 `cli.py`（命令编排与 manifest 增量写入）。推荐新用法统一走 `vlp` CLI；根目录 legacy 脚本仅作兼容入口。
+
+### 架构总结
+
+整体是一个本地命令行内容处理流水线：`cli.py` 作为编排枢纽，调用各服务模块完成下载、转录、摘要等步骤，并通过 `manifest.json` 持续记录任务状态。
+
+```mermaid
+flowchart TB
+    subgraph CLI["CLI 层 (cli.py)"]
+        run[run_command]
+        dl[download_command]
+        tr[transcribe_command]
+        sm[summarize_command]
+        doc[doctor_command]
+    end
+
+    subgraph Services["服务层"]
+        ED[execute_download]
+        TP[transcribe_path]
+        ST[summarize_transcript]
+        CV[convert_subtitle]
+    end
+
+    subgraph Infra["基础设施"]
+        CFG[load_config / ConfigBundle]
+        MF[Manifest / upsert_manifest]
+        ERR[VlpError 体系]
+    end
+
+    subgraph Backends["后端实现"]
+        YTDLP[yt-dlp]
+        SEL[Selenium fallback]
+        FF[ffmpeg]
+        WH[faster/openai whisper]
+        LLM[Claude/OpenAI/Gemini]
+    end
+
+    run --> ED --> YTDLP
+    ED --> SEL
+    run --> TP --> FF --> WH
+    run --> ST --> LLM
+    dl --> ED
+    tr --> TP
+    sm --> ST
+
+    CLI --> CFG
+    CLI --> MF
+    Services --> ERR
+```
+
+关键调用关系：
+
+- **`vlp run`**：`execute_download` → `transcribe_path` → `summarize_transcript`，各阶段通过 `upsert_manifest` 增量写入 `manifest.json`；若 job 目录已有 `transcript.txt` 或 `summary.md`，会先复用已有产物。
+- **下载链路**：主路径走 `yt-dlp`；失败后按 `should_attempt_selenium_fallback` 判断是否进入 Selenium 浏览器兜底，再携带浏览器上下文重试下载。
+- **转录链路**：`resolve_input_media` → `extract_audio_from_video`（ffmpeg）→ 选择 faster/openai whisper 引擎 → 生成 SRT/VTT。
+- **摘要链路**：`load_transcript` → 按配置选择 Claude / OpenAI / Gemini provider。
+- **配置入口**：所有 CLI 命令经 `_command_context` 调用 `load_config`，优先级为 CLI 参数 > 环境变量 / `.env` > `config.yaml` > 内置默认值。
 
 ## 安装
 
@@ -292,6 +395,35 @@ python -m pytest tests/test_download_diagnostics.py
 - `scripts/check.ps1` 开头也会打印当前 `sys.executable`，便于快速确认脚本实际使用的是哪个 Python
 - 如果你只是想确认最近文档/测试改动没有引入语法问题，`python -m compileall src tests` 是当前成本最低的一步
 
+## Skill 同步
+
+如果你希望把仓库里的 Codex skill 一起维护并安装到全局可发现目录，当前仓库已经提供了一个同步脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+```
+
+这个脚本默认会做三件事：
+
+- 把仓库内的 `skills/video-link-pipeline` 同步到全局目录 `~/.codex/skills/video-link-pipeline`
+- 如果设置了 `CODEX_HOME`，则优先同步到 `$CODEX_HOME/skills/video-link-pipeline`
+- 同步完成后自动运行 `quick_validate.py` 校验安装后的 skill
+
+当前推荐约定是：
+
+- 只编辑仓库内的 `skills/video-link-pipeline`
+- 改完后再运行 `scripts/sync-skill.ps1` 发布到全局目录
+- 如果你只想同步不校验，可以追加 `-SkipValidate`
+
+例如：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1 -SkipValidate
+```
+
+这样可以避免“仓库版本”和“全局安装版本”长期漂移，后续测试 skill 时也能始终基于最新内容。
+
 ## 配置
 
 默认配置文件是项目根目录下的 `config.yaml`。
@@ -307,6 +439,7 @@ python -m pytest tests/test_download_diagnostics.py
 
 ```yaml
 output_dir: ./output
+group_output_by_site: false
 temp_dir: ./temp
 
 download:
@@ -354,6 +487,7 @@ OPENAI_API_KEY=...
 GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=...
 VLP_OUTPUT_DIR=./output
+VLP_GROUP_OUTPUT_BY_SITE=false
 VLP_DOWNLOAD_COOKIES_FROM_BROWSER=chrome
 VLP_WHISPER_MODEL=small
 VLP_SUMMARY_PROVIDER=claude
@@ -364,6 +498,7 @@ VLP_SUMMARY_PROVIDER=claude
 - 旧配置 `summary.api_keys.*` 仍会被兼容读取，但会给出迁移 warning
 - `vlp doctor` 会提示当前 FFmpeg 来源和 Selenium/cookies 相关问题
 - `--selenium auto|on|off` 已接入 `download` 和 `run`
+- `group_output_by_site=true` 时，下载任务会按站点归类到子目录，例如 `output/bilibili/...`、`output/youtube/...`
 
 ## 使用方式
 
@@ -377,13 +512,22 @@ vlp download "https://..." --audio-only
 vlp download "https://..." --cookies-from-browser chrome
 vlp download "https://..." --cookie-file ./cookies.txt
 vlp download "https://..." --selenium auto
+vlp download "https://..." --group-by-site
 
-# 只下载字幕，适合 B 站这类字幕可拿但视频格式可能受限的站点
+# 只下载字幕和元数据，适合 B 站这类字幕可拿但视频格式可能受限的站点
 vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
+vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --group-by-site
 
-# 如果你还没有把项目安装成全局命令，也可以直接在仓库里运行
+# 如果你当前终端里的 `vlp` 还没更新到仓库最新代码，也可以直接在仓库里运行
 python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
 ```
+
+使用 `--cookies-from-browser chrome` 时请注意：
+
+- 这里的 `BV...` 只是示例占位符，实际运行时需要替换成真实视频链接
+- Chrome / Edge / Firefox 如果正在运行，浏览器 cookies 数据库可能被占用，导致命令行无法复制 cookies
+- Windows 下这个问题尤其常见；如果看到 `Could not copy Chrome cookie database`，先彻底关闭浏览器及其后台进程再重试
+- 如果你不想每次都关闭浏览器，可以先导出 `cookies.txt`，后续改用 `--cookie-file`
 
 ### 转录
 
@@ -425,6 +569,18 @@ vlp doctor --config ./config.yaml
 ## 输出约定
 
 `output_dir` 是输出根目录，每次任务会落到单独的 job 目录中。
+
+如果开启 `group_output_by_site` 或命令行传入 `--group-by-site`，下载输出会先按站点归类，再落到具体 job 目录，例如：
+
+```text
+output/
+├─ bilibili/
+│  └─ BVxxxx-demo-title/
+├─ youtube/
+│  └─ demo-title/
+└─ douyin/
+   └─ demo-title/
+```
 
 典型输出如下：
 

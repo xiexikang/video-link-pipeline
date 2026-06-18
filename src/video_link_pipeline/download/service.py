@@ -1,8 +1,11 @@
-﻿"""High-level download service helpers and execution."""
+"""High-level download service helpers and execution."""
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +42,9 @@ SITE_BUCKET_ALIASES: dict[str, str] = {
     "twitter.com": "x",
     "x.com": "x",
 }
+
+MAX_JOB_SLUG_LENGTH = 80
+JOB_VIDEO_BASENAME = "video"
 
 
 @dataclass(slots=True)
@@ -563,8 +569,88 @@ def resolve_job_directory(
     if site_bucket:
         root = root / sanitize_filename(site_bucket)
     slug = sanitize_filename(title)
+    if len(slug) > MAX_JOB_SLUG_LENGTH:
+        slug = slug[:MAX_JOB_SLUG_LENGTH].rstrip("_.")
     folder_name = f"{video_id}-{slug}" if video_id else slug
     return root / folder_name
+
+
+def _normalize_quality_format(quality: str, *, has_ffmpeg: bool) -> str:
+    """Map config-friendly quality aliases to yt-dlp format selectors."""
+    normalized = quality.strip() or "best"
+    if normalized.lower() != "best":
+        return normalized
+    # yt-dlp `-f best` prefers a pre-merged stream; Bilibili and many sites only
+    # expose separate video/audio tracks and require merge when ffmpeg is available.
+    if has_ffmpeg:
+        # Prefer codecs that remux cleanly into mp4; fall back to any best tracks.
+        return "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo+bestaudio/best"
+    return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+
+
+def _node_executable_usable(path: str) -> bool:
+    try:
+        completed = subprocess.run(
+            [path, "--version"],
+            capture_output=True,
+            check=False,
+            timeout=5,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return completed.returncode == 0
+
+
+def _iter_node_candidates() -> list[str]:
+    seen: set[str] = set()
+    candidates: list[str] = []
+
+    def add(path: str | Path | None) -> None:
+        if path is None:
+            return
+        resolved = str(Path(path))
+        if resolved in seen:
+            return
+        seen.add(resolved)
+        candidates.append(resolved)
+
+    add(shutil.which("node"))
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        fnm_root = Path(local_app_data) / "fnm_multishells"
+        if fnm_root.is_dir():
+            for node_path in sorted(
+                fnm_root.glob("*/node.exe"),
+                key=lambda item: item.stat().st_mtime,
+                reverse=True,
+            ):
+                add(node_path)
+
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    add(Path(program_files) / "nodejs" / "node.exe")
+    add(Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "nodejs" / "node.exe")
+    return candidates
+
+
+def _resolve_node_executable() -> str | None:
+    """Resolve Node.js even when the active shell PATH is unavailable (e.g. uvicorn workers)."""
+    for candidate in _iter_node_candidates():
+        if _node_executable_usable(candidate):
+            return candidate
+    return None
+
+
+def _youtube_js_challenge_options() -> dict[str, Any]:
+    """Enable yt-dlp YouTube JS challenge solving when Node.js is available."""
+    node_path = _resolve_node_executable()
+    if not node_path:
+        return {}
+    return {
+        "js_runtimes": {"node": {"path": node_path}},
+        "remote_components": ("ejs:github",),
+    }
 
 
 def build_base_ydl_options(
@@ -600,8 +686,9 @@ def build_base_ydl_options(
             "writeautomaticsub": False,
         }
     else:
+        resolved_quality = _normalize_quality_format(quality, has_ffmpeg=bool(ffmpeg_path))
         options = {
-            "format": quality,
+            "format": resolved_quality,
             "merge_output_format": "mp4",
             "writesubtitles": True,
             "writeautomaticsub": True,
@@ -621,9 +708,10 @@ def build_base_ydl_options(
     if ffmpeg_path:
         options["ffmpeg_location"] = ffmpeg_path
     elif not audio_only and not subtitle_only:
-        options["format"] = "best[ext=mp4]/best"
+        options["format"] = _normalize_quality_format(quality, has_ffmpeg=False)
         options.pop("merge_output_format", None)
     options.update(build_cookie_options(cookie_source))
+    options.update(_youtube_js_challenge_options())
     return options
 
 
@@ -655,7 +743,7 @@ def prepare_download(
     site_bucket = resolve_site_bucket(url) if group_output_by_site else None
     job_dir = resolve_job_directory(output_root, title, site_bucket=site_bucket)
     ydl_options = build_base_ydl_options(
-        output_template=str(job_dir / f"{title}.%(ext)s"),
+        output_template=str(job_dir / f"{JOB_VIDEO_BASENAME}.%(ext)s"),
         languages=normalized_languages,
         quality=quality,
         audio_only=audio_only,
@@ -784,7 +872,7 @@ def probe_download(
         duration_seconds=duration_seconds if isinstance(duration_seconds, (int, float)) else None,
         duration_human=str(duration_human) if duration_human else None,
         ydl_options=build_base_ydl_options(
-            output_template=str(resolved_output_dir / f"{sanitize_filename(raw_title)}.%(ext)s"),
+            output_template=str(resolved_output_dir / f"{JOB_VIDEO_BASENAME}.%(ext)s"),
             languages=languages or ["zh", "en"],
             quality=quality,
             audio_only=audio_only,
