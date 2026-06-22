@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api/client";
+import { cancelCookieLogin, exportCookieLogin, startCookieLogin } from "../api/cookies";
 import { createJob } from "../api/jobs";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { Button } from "../components/ui/Button";
@@ -14,6 +15,12 @@ const JOB_TYPES = [
   { value: "summarize", label: "Summarize", desc: "从已有 transcript 生成摘要" },
 ] as const;
 
+const BROWSER_LABELS: Record<string, string> = {
+  chrome: "Chrome",
+  edge: "Edge",
+  firefox: "Firefox",
+};
+
 function isYouTubeUrl(value: string): boolean {
   return /youtube\.com|youtu\.be/i.test(value);
 }
@@ -25,8 +32,12 @@ export function JobNew() {
   const [url, setUrl] = useState("");
   const [inputPath, setInputPath] = useState("");
   const [cookiesBrowser, setCookiesBrowser] = useState("");
+  const [cookiesFile, setCookiesFile] = useState("");
   const [doTranscribe, setDoTranscribe] = useState(true);
   const [doSummary, setDoSummary] = useState(false);
+  const [cookieSessionId, setCookieSessionId] = useState<string | null>(null);
+  const [cookieLoginBusy, setCookieLoginBusy] = useState(false);
+  const [cookieLoginMessage, setCookieLoginMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +48,17 @@ export function JobNew() {
     jobType === "run" || jobType === "download" || jobType === "download-subs";
 
   useEffect(() => {
-    void fetchJson<{ effective: { download?: { cookies_from_browser?: string | null } } }>(
-      "/api/config/effective",
-    )
+    void fetchJson<{
+      effective: { download?: { cookies_from_browser?: string | null; cookie_file?: string | null } };
+    }>("/api/config/effective")
       .then((payload) => {
         const browser = payload.effective?.download?.cookies_from_browser;
+        const cookieFile = payload.effective?.download?.cookie_file;
         if (typeof browser === "string" && browser) {
           setCookiesBrowser(browser);
+        }
+        if (typeof cookieFile === "string" && cookieFile) {
+          setCookiesFile(cookieFile);
         }
       })
       .catch(() => undefined);
@@ -59,7 +74,9 @@ export function JobNew() {
         options.do_transcribe = doTranscribe;
         options.do_summary = doSummary;
       }
-      if (cookiesBrowser) {
+      if (cookiesFile.trim()) {
+        options.cookie_file = cookiesFile.trim();
+      } else if (cookiesBrowser) {
         options.cookies_from_browser = cookiesBrowser;
       }
 
@@ -75,6 +92,57 @@ export function JobNew() {
       setError(err instanceof Error ? err.message : "提交失败");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStartCookieLogin = async () => {
+    if (!url.trim()) {
+      setError("请先填写视频链接或平台首页 URL");
+      return;
+    }
+    setCookieLoginBusy(true);
+    setError(null);
+    setCookieLoginMessage(null);
+    try {
+      const response = await startCookieLogin({
+        url: url.trim(),
+        cookie_file: cookiesFile.trim() || undefined,
+      });
+      setCookieSessionId(response.session_id);
+      setCookiesFile(response.cookie_file);
+      setCookieLoginMessage(response.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "打开登录窗口失败");
+    } finally {
+      setCookieLoginBusy(false);
+    }
+  };
+
+  const handleExportCookieLogin = async () => {
+    if (!cookieSessionId) return;
+    setCookieLoginBusy(true);
+    setError(null);
+    try {
+      const response = await exportCookieLogin(cookieSessionId);
+      setCookiesFile(response.cookie_file);
+      setCookieSessionId(null);
+      setCookieLoginMessage(response.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "导出 Cookies 失败");
+    } finally {
+      setCookieLoginBusy(false);
+    }
+  };
+
+  const handleCancelCookieLogin = async () => {
+    if (!cookieSessionId) return;
+    setCookieLoginBusy(true);
+    try {
+      await cancelCookieLogin(cookieSessionId);
+      setCookieSessionId(null);
+      setCookieLoginMessage("已关闭登录窗口");
+    } finally {
+      setCookieLoginBusy(false);
     }
   };
 
@@ -194,15 +262,70 @@ export function JobNew() {
             </select>
             {!cookiesBrowser && isYouTubeUrl(url) && (
               <p className={styles.hint} style={{ marginTop: 8 }}>
-                YouTube 通常需要浏览器 cookies，请选择已登录 YouTube 的浏览器。
+                YouTube 如需登录态，推荐先用 CLI 导出 cookies.txt，再在下方填写文件路径。
               </p>
             )}
           </div>
         )}
 
+        {needsDownload && (
+          <div className={styles.field}>
+            <label htmlFor="cookieFile">Cookies 文件路径</label>
+            <input
+              id="cookieFile"
+              type="text"
+              placeholder="G:\\www-xxk\\video-link-pipeline\\cookies.txt"
+              value={cookiesFile}
+              onChange={(event) => setCookiesFile(event.target.value)}
+            />
+            <p className={styles.hint} style={{ marginTop: 8 }}>
+              优先使用 `vlp cookies-login` 导出的 Netscape cookies.txt。填写后 Web 下载不会读取浏览器数据库，也不用关闭浏览器。
+            </p>
+            <div className={styles.inlineActions}>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={cookieLoginBusy || Boolean(cookieSessionId)}
+                onClick={() => void handleStartCookieLogin()}
+              >
+                {cookieLoginBusy && !cookieSessionId ? "打开中…" : "打开登录窗口"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={cookieLoginBusy || !cookieSessionId}
+                onClick={() => void handleExportCookieLogin()}
+              >
+                导出 Cookies
+              </Button>
+              {cookieSessionId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={cookieLoginBusy}
+                  onClick={() => void handleCancelCookieLogin()}
+                >
+                  取消登录
+                </Button>
+              )}
+            </div>
+            {cookieLoginMessage && (
+              <p className={styles.hint} style={{ marginTop: 8 }}>
+                {cookieLoginMessage}
+              </p>
+            )}
+          </div>
+        )}
+
+        {needsDownload && cookiesFile.trim() && (
+          <div className={styles.callout}>
+            将使用 cookies 文件：{cookiesFile.trim()}。浏览器可以保持打开。
+          </div>
+        )}
+
         {needsDownload && cookiesBrowser && (
           <div className={styles.callout}>
-            提交前请完全关闭 {cookiesBrowser === "firefox" ? "Firefox" : "Chrome / Edge / Firefox"}。
+            未填写 cookies 文件时才会读取 {BROWSER_LABELS[cookiesBrowser] || cookiesBrowser} cookies；如果遇到锁库，请改用上方 cookies 文件路径。
           </div>
         )}
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from web.api.routes import artifacts, config_route, doctor, health, jobs
+from web.api.routes import artifacts, config_route, cookies, doctor, health, jobs
 
 app = FastAPI(
     title="VLP Web API",
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(config_route.router)
+app.include_router(cookies.router)
 app.include_router(doctor.router)
 app.include_router(jobs.router)
 app.include_router(artifacts.router)

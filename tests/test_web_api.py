@@ -99,3 +99,46 @@ def test_doctor_endpoint(client: TestClient) -> None:
     assert "checks" in payload
     assert isinstance(payload["checks"], list)
     assert "output_dir" in payload
+
+
+def test_cookie_login_routes(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    cookie_file = tmp_path / "youtube-cookies.txt"
+
+    class FakeCookieRegistry:
+        def start(self, *, url: str, cookie_file: str | Path | None = None) -> tuple[str, Path]:
+            assert url == "https://www.youtube.com"
+            assert cookie_file == str(cookie_file_path)
+            return "session-1", Path(str(cookie_file))
+
+        def export(self, session_id: str) -> Path | None:
+            assert session_id == "session-1"
+            cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+            return cookie_file
+
+        def cancel(self, session_id: str) -> bool:
+            return session_id == "session-1"
+
+    cookie_file_path = cookie_file
+    monkeypatch.setattr(
+        "web.api.routes.cookies.get_cookie_login_registry",
+        lambda: FakeCookieRegistry(),
+    )
+
+    start_response = client.post(
+        "/api/cookies/login/start",
+        json={
+            "url": "https://www.youtube.com",
+            "cookie_file": str(cookie_file),
+        },
+    )
+
+    assert start_response.status_code == 200
+    start_payload = start_response.json()
+    assert start_payload["session_id"] == "session-1"
+    assert start_payload["cookie_file"] == str(cookie_file)
+
+    export_response = client.post("/api/cookies/login/session-1/export")
+
+    assert export_response.status_code == 200
+    export_payload = export_response.json()
+    assert export_payload["cookie_file"] == str(cookie_file)

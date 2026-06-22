@@ -215,6 +215,13 @@
   font-size: 0.8125rem;
 }
 
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .stickySubmit {
   position: sticky;
   bottom: calc(var(--tabbar-h) + 8px);
