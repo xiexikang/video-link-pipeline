@@ -39,3 +39,14 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Local runtime artifacts
+cookies*.txt
+temp/cookie-login-profile/
+temp/web-cookie-profiles/
+temp/web-cookies/
+temp/*.mp4
+temp/*.webm
+
+# Frontend incremental build cache
+web/frontend/*.tsbuildinfo
