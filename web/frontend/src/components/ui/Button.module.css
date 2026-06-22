@@ -7,21 +7,23 @@
   padding: 0 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  font-weight: 500;
-  transition: background 120ms ease, border-color 120ms ease;
+  font-weight: 600;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .primary {
   background: var(--vlp-accent);
-  color: #13151a;
+  color: #f8fbfa;
+  box-shadow: var(--vlp-shadow-sm);
 }
 
 .primary:hover {
-  filter: brightness(1.05);
+  background: var(--vlp-accent-strong);
+  transform: translateY(-1px);
 }
 
 .ghost {
-  background: transparent;
+  background: color-mix(in srgb, var(--vlp-elevated) 72%, transparent);
   border-color: var(--vlp-border);
   color: var(--vlp-text);
 }

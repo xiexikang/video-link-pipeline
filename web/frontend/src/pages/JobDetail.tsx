@@ -136,14 +136,46 @@ export function JobDetail() {
   });
 
   const title = detail.job_dir ? detail.job_dir.split("/").pop() : "任务";
+  const artifactCount = Object.keys(artifactMap).length;
 
   return (
     <section>
-      <header className={styles.detailHeader}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <h2 className="display-sm" style={{ margin: 0 }}>
+      <div className={styles.heroPanel}>
+        <div>
+          <div className="caption">Job detail</div>
+          <h2 className="display-lg" style={{ margin: "6px 0 0" }}>
             {title}
           </h2>
+          <p className={styles.heroLead}>
+            查看当前任务处于哪个阶段、是否有诊断信息，以及已经生成了哪些可继续复用的文件。
+          </p>
+        </div>
+        <div className={styles.heroMeta}>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{artifactCount}</div>
+            <div className={styles.statLabel}>已发现产物</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{diagnostics.length}</div>
+            <div className={styles.statLabel}>诊断项</div>
+          </div>
+        </div>
+      </div>
+
+      <header className={styles.detailHeader}>
+        <div className={styles.detailTitleRow}>
+          <div>
+            <h2 className="display-sm" style={{ margin: 0 }}>
+              当前执行状态
+            </h2>
+            <div className={styles.detailSummary}>
+              {detail.runtime_status === "failed"
+                ? "任务已中断，优先查看下方诊断和执行日志。"
+                : detail.runtime_status === "succeeded"
+                  ? "任务已完成，可以直接查看和复用输出结果。"
+                  : "任务仍在处理中，阶段状态和日志会持续刷新。"}
+            </div>
+          </div>
           <Badge status={detail.runtime_status} />
         </div>
         {typeof input?.url === "string" ? (
@@ -161,6 +193,22 @@ export function JobDetail() {
               · <span className="mono">{detail.job_dir}</span>
             </>
           ) : null}
+        </div>
+        <div className={styles.detailMetaGrid}>
+          <div className={styles.metaCard}>
+            <div className={styles.metaCardLabel}>来源</div>
+            <div className={styles.metaCardValue}>{source}</div>
+          </div>
+          <div className={styles.metaCard}>
+            <div className={styles.metaCardLabel}>目录</div>
+            <div className={`${styles.metaCardValue} mono`}>{detail.job_dir || "未记录"}</div>
+          </div>
+          <div className={styles.metaCard}>
+            <div className={styles.metaCardLabel}>命令</div>
+            <div className={`${styles.metaCardValue} mono`}>
+              {typeof detail.manifest.command === "string" ? detail.manifest.command : "未知命令"}
+            </div>
+          </div>
         </div>
       </header>
 

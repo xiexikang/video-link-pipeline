@@ -5,18 +5,20 @@
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--vlp-border);
+  background: color-mix(in srgb, var(--vlp-panel) 40%, white);
   font-size: 0.75rem;
   white-space: nowrap;
 }
 
 .idle {
   color: var(--vlp-text-muted);
-  border-color: var(--vlp-idle);
+  border-color: color-mix(in srgb, var(--vlp-idle) 36%, var(--vlp-border));
 }
 
 .running {
-  color: var(--vlp-accent);
-  border-color: var(--vlp-accent);
+  color: var(--vlp-accent-strong);
+  border-color: color-mix(in srgb, var(--vlp-accent) 40%, var(--vlp-border));
+  background: var(--vlp-accent-soft);
 }
 
 .done {

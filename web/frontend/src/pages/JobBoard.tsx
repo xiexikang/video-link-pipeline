@@ -50,14 +50,51 @@ export function JobBoard() {
     return jobs.filter((job) => job.runtime_status === filter);
   }, [filter, jobs]);
 
+  const stats = useMemo(() => {
+    const running = jobs.filter((job) => job.runtime_status === "running" || job.runtime_status === "queued").length;
+    const failed = jobs.filter((job) => job.runtime_status === "failed").length;
+    const completed = jobs.filter((job) => job.runtime_status === "succeeded").length;
+    return { running, failed, completed };
+  }, [jobs]);
+
   return (
     <section>
+      <div className={styles.heroPanel}>
+        <div>
+          <div className="caption">Pipeline overview</div>
+          <h2 className="display-lg" style={{ margin: "6px 0 0" }}>
+            统一查看每个任务当前走到哪一步
+          </h2>
+          <p className={styles.heroLead}>
+            这里集中展示下载、转录、摘要三个阶段的进度。失败任务能快速定位，已有产物也能继续复用。
+          </p>
+        </div>
+        <div className={styles.heroMeta}>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{jobs.length}</div>
+            <div className={styles.statLabel}>任务总数</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{stats.running}</div>
+            <div className={styles.statLabel}>进行中</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{stats.completed}</div>
+            <div className={styles.statLabel}>已完成</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{stats.failed}</div>
+            <div className={styles.statLabel}>需要处理</div>
+          </div>
+        </div>
+      </div>
+
       <div className={styles.sectionHeader}>
         <div>
           <h2 className="display-sm" style={{ margin: 0 }}>
-            任务
+            任务列表
           </h2>
-          <div className="caption">{jobs.length} 个任务</div>
+          <div className={styles.hint}>按运行状态筛选，进入详情页查看日志、诊断信息和产物预览。</div>
         </div>
       </div>
 
@@ -82,7 +119,7 @@ export function JobBoard() {
       ) : filteredJobs.length === 0 ? (
         <div className={styles.empty}>
           <h3 className="display-sm">还没有任务</h3>
-          <p>用 CLI 跑一个 job，或新建任务开始。</p>
+          <p>先发起一次下载、转录或摘要任务，这里就会开始显示进度和结果。</p>
           <Button fullWidth onClick={() => navigate("/jobs/new")}>
             新建任务
           </Button>

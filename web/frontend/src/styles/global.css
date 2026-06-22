@@ -8,11 +8,13 @@
 
 html {
   font-size: 15px;
+  height: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
+  height: 100%;
   background: var(--vlp-base);
   color: var(--vlp-text);
   font-family: var(--font-body);
@@ -23,6 +25,7 @@ body {
 
 #root {
   min-height: 100dvh;
+  height: 100%;
 }
 
 a {
@@ -57,9 +60,12 @@ button {
 }
 
 .app-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding-inline: var(--page-px);
   padding-bottom: var(--page-pb);
-  min-height: 100dvh;
+  padding-top: 20px;
   animation: main-fade 150ms ease;
 }
 
@@ -86,9 +92,9 @@ button {
 
 .display-lg {
   font-family: var(--font-display);
-  font-size: 1.375rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .display-sm {
@@ -100,22 +106,24 @@ button {
 
 @media (min-width: 768px) {
   .display-lg {
-    font-size: 1.75rem;
+    font-size: 2rem;
   }
 
   .display-sm {
-    font-size: 1.25rem;
+    font-size: 1.35rem;
   }
 }
 
 .caption {
-  font-size: 0.6875rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--vlp-text-secondary);
 }
 
 @media (min-width: 768px) {
   .caption {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
   }
 }

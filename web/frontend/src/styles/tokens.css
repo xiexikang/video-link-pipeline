@@ -1,16 +1,22 @@
 :root {
-  --vlp-base: #13151a;
-  --vlp-surface: #1c1f26;
-  --vlp-elevated: #252932;
-  --vlp-border: #343a46;
-  --vlp-text: #e8eaed;
-  --vlp-text-secondary: #9aa3b2;
-  --vlp-text-muted: #6b7280;
-  --vlp-accent: #e5a023;
-  --vlp-ok: #4ec9a0;
-  --vlp-fail: #e06c75;
-  --vlp-skip: #5c6370;
-  --vlp-idle: #3d4450;
+  --vlp-base: #edf1eb;
+  --vlp-surface: #f8faf7;
+  --vlp-elevated: #ffffff;
+  --vlp-panel: #e1e8e1;
+  --vlp-border: #ccd6cd;
+  --vlp-text: #1f2b26;
+  --vlp-text-secondary: #52625b;
+  --vlp-text-muted: #7c887f;
+  --vlp-accent: #1f7a6b;
+  --vlp-accent-strong: #185f54;
+  --vlp-accent-soft: #dceee8;
+  --vlp-ok: #2f8f63;
+  --vlp-fail: #b24d4d;
+  --vlp-warn: #b07b31;
+  --vlp-skip: #8d9389;
+  --vlp-idle: #a8b2a8;
+  --vlp-shadow-sm: 0 8px 24px rgba(29, 44, 36, 0.06);
+  --vlp-shadow-lg: 0 18px 48px rgba(29, 44, 36, 0.1);
 
   --font-display: "Syne", system-ui, sans-serif;
   --font-body: "Source Sans 3", system-ui, sans-serif;
@@ -22,8 +28,8 @@
   --sidebar-w: 0px;
   --touch-min: 44px;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 }
 
 @media (min-width: 768px) {

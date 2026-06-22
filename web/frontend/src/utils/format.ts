@@ -25,11 +25,11 @@ export function formatRelativeTime(iso: string | null): string {
 
 export function runtimeLabel(status: string): string {
   const labels: Record<string, string> = {
-    queued: "Queued",
-    running: "Running",
-    succeeded: "Succeeded",
-    failed: "Failed",
-    idle: "Idle",
+    queued: "排队中",
+    running: "运行中",
+    succeeded: "已完成",
+    failed: "失败",
+    idle: "空闲",
   };
   return labels[status] ?? status;
 }

@@ -8,11 +8,11 @@ import { Button } from "../components/ui/Button";
 import styles from "./pages.module.css";
 
 const JOB_TYPES = [
-  { value: "run", label: "Run", desc: "下载并可选转录、摘要" },
-  { value: "download-subs", label: "Download subs", desc: "仅下载字幕与元数据" },
-  { value: "download", label: "Download", desc: "下载媒体文件" },
-  { value: "transcribe", label: "Transcribe", desc: "转录本地媒体" },
-  { value: "summarize", label: "Summarize", desc: "从已有 transcript 生成摘要" },
+  { value: "run", label: "完整流程", desc: "下载内容，并按需继续转录和摘要。" },
+  { value: "download-subs", label: "仅抓字幕", desc: "只保留字幕、页面信息和基础元数据。" },
+  { value: "download", label: "仅下载媒体", desc: "抓取视频或音频文件，不继续处理。" },
+  { value: "transcribe", label: "转录本地媒体", desc: "从已有文件生成 transcript。" },
+  { value: "summarize", label: "生成摘要", desc: "从已有 transcript 提炼摘要内容。" },
 ] as const;
 
 const BROWSER_LABELS: Record<string, string> = {
@@ -148,7 +148,27 @@ export function JobNew() {
 
   return (
     <section>
-      <p className={styles.hint}>选项与 `vlp` CLI 对齐。</p>
+      <div className={styles.heroPanel}>
+        <div>
+          <div className="caption">New job</div>
+          <h2 className="display-lg" style={{ margin: "6px 0 0" }}>
+            选择来源，发起一次新的处理流程
+          </h2>
+          <p className={styles.heroLead}>
+            Web 端和 `vlp` CLI 使用同一套能力。这里更适合发起任务、补 Cookies 登录，再回到详情页观察阶段进度。
+          </p>
+        </div>
+        <div className={styles.heroMeta}>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{needsDownload ? "下载" : "处理"}</div>
+            <div className={styles.statLabel}>当前任务面向</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{jobType === "run" ? "3" : "1"}</div>
+            <div className={styles.statLabel}>预计阶段数</div>
+          </div>
+        </div>
+      </div>
 
       <form
         className={styles.form}
@@ -158,7 +178,8 @@ export function JobNew() {
         }}
       >
         <div className={styles.field}>
-          <label>任务类型</label>
+          <div className={styles.fieldTitle}>任务类型</div>
+          <div className={styles.fieldCopy}>先决定这次只下载，还是要继续转录与摘要。</div>
           {isDesktop ? (
             <div className={styles.filters}>
               {JOB_TYPES.map((item) => (
@@ -200,6 +221,8 @@ export function JobNew() {
 
         {needsUrl && (
           <div className={styles.field}>
+            <div className={styles.fieldTitle}>来源链接</div>
+            <div className={styles.fieldCopy}>填写视频页或可直接解析的内容链接。</div>
             <label htmlFor="url">视频链接</label>
             <input
               id="url"
@@ -214,6 +237,8 @@ export function JobNew() {
 
         {needsPath && (
           <div className={styles.field}>
+            <div className={styles.fieldTitle}>本地输入</div>
+            <div className={styles.fieldCopy}>输入本地媒体或 transcript 路径，直接进入对应阶段。</div>
             <label htmlFor="inputPath">本地路径</label>
             <input
               id="inputPath"
@@ -227,28 +252,40 @@ export function JobNew() {
         )}
 
         {jobType === "run" && (
-          <>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={doTranscribe}
-                onChange={(event) => setDoTranscribe(event.target.checked)}
-              />
-              转录（--do-transcribe）
-            </label>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={doSummary}
-                onChange={(event) => setDoSummary(event.target.checked)}
-              />
-              摘要（--do-summary）
-            </label>
-          </>
+          <div className={styles.field}>
+            <div className={styles.fieldTitle}>后续阶段</div>
+            <div className={styles.fieldCopy}>完整流程里可以决定下载完成后是否继续处理。</div>
+            <div className={styles.optionList}>
+              <label className={styles.optionRow}>
+                <input
+                  type="checkbox"
+                  checked={doTranscribe}
+                  onChange={(event) => setDoTranscribe(event.target.checked)}
+                />
+                <span className={styles.optionBody}>
+                  <span className={styles.optionTitle}>继续转录</span>
+                  <span className={styles.optionCopy}>生成 transcript，便于搜索、校对和后续摘要。</span>
+                </span>
+              </label>
+              <label className={styles.optionRow}>
+                <input
+                  type="checkbox"
+                  checked={doSummary}
+                  onChange={(event) => setDoSummary(event.target.checked)}
+                />
+                <span className={styles.optionBody}>
+                  <span className={styles.optionTitle}>继续摘要</span>
+                  <span className={styles.optionCopy}>基于 transcript 提炼重点，便于复用成内容素材。</span>
+                </span>
+              </label>
+            </div>
+          </div>
         )}
 
         {needsDownload && (
           <div className={styles.field}>
+            <div className={styles.fieldTitle}>浏览器 Cookies</div>
+            <div className={styles.fieldCopy}>需要登录态的平台，优先准备 Cookies，再发起下载。</div>
             <label htmlFor="cookies">Cookies 浏览器</label>
             <select
               id="cookies"
@@ -270,17 +307,36 @@ export function JobNew() {
 
         {needsDownload && (
           <div className={styles.field}>
+            <div className={styles.fieldTitle}>Cookies 文件</div>
+            <div className={styles.fieldCopy}>推荐使用导出的 cookies.txt，避免直接读取浏览器数据库。</div>
             <label htmlFor="cookieFile">Cookies 文件路径</label>
             <input
               id="cookieFile"
               type="text"
-              placeholder="G:\\www-xxk\\video-link-pipeline\\cookies.txt"
+              placeholder="temp\web-cookies\bilibili.com.txt"
               value={cookiesFile}
               onChange={(event) => setCookiesFile(event.target.value)}
             />
             <p className={styles.hint} style={{ marginTop: 8 }}>
               优先使用 `vlp cookies-login` 导出的 Netscape cookies.txt。填写后 Web 下载不会读取浏览器数据库，也不用关闭浏览器。
             </p>
+            <div className={styles.callout}>
+              <strong>使用方式</strong>
+              <div className={styles.calloutSteps}>
+                <div className={styles.calloutStep}>
+                  <span className={styles.calloutStepIndex}>1</span>
+                  <span>点击“打开登录窗口”。</span>
+                </div>
+                <div className={styles.calloutStep}>
+                  <span className={styles.calloutStepIndex}>2</span>
+                  <span>在弹出的浏览器里完成登录，并保持该页面打开。</span>
+                </div>
+                <div className={styles.calloutStep}>
+                  <span className={styles.calloutStepIndex}>3</span>
+                  <span>回到这里点击“导出 Cookies”，写入当前文件路径后再提交任务。</span>
+                </div>
+              </div>
+            </div>
             <div className={styles.inlineActions}>
               <Button
                 type="button"
@@ -334,10 +390,7 @@ export function JobNew() {
 
         <div className={styles.stickySubmit}>
           <Button type="submit" fullWidth disabled={submitting}>
-            {submitting ? "提交中…" : "开始任务"}
-          </Button>
-          <Button type="button" variant="ghost" fullWidth onClick={() => navigate("/")}>
-            返回看板
+            {submitting ? "提交中…" : "创建并开始任务"}
           </Button>
         </div>
       </form>

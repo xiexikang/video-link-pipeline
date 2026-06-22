@@ -1,18 +1,20 @@
 .shell {
   display: grid;
   min-height: 100dvh;
+  height: 100dvh;
   grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: auto 1fr;
   background: var(--vlp-base);
+  overflow: hidden;
 }
 
 .sidebar,
 .iconRail {
   display: none;
-  background: var(--vlp-surface);
+  background: color-mix(in srgb, var(--vlp-surface) 84%, white);
   border-right: 1px solid var(--vlp-border);
   flex-direction: column;
-  padding: 20px 12px;
+  padding: 18px 12px;
 }
 
 @media (min-width: 768px) {
@@ -35,10 +37,42 @@
 
 .brand {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  margin-bottom: 24px;
+}
+
+.brandBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--vlp-accent), var(--vlp-accent-strong));
+  color: white;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: var(--vlp-shadow-sm);
+}
+
+.brandText {
+  min-width: 0;
+}
+
+.brandMeta {
+  margin-top: 4px;
+  color: var(--vlp-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .nav {
@@ -56,7 +90,7 @@
   padding: 0 12px;
   border-radius: var(--radius-md);
   color: var(--vlp-text-secondary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .navLink:hover {
@@ -65,8 +99,8 @@
 }
 
 .active {
-  color: var(--vlp-accent);
-  background: color-mix(in srgb, var(--vlp-accent) 10%, transparent);
+  color: var(--vlp-accent-strong);
+  background: var(--vlp-accent-soft);
 }
 
 .iconOnly {
@@ -78,6 +112,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100dvh;
 }
 
 .topBar {
@@ -85,7 +121,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px var(--page-px) 0;
+  padding: 20px var(--page-px) 0;
+  flex: 0 0 auto;
 }
 
 @media (min-width: 768px) {
@@ -98,6 +135,18 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.topBarIntro {
+  min-width: 0;
+}
+
+.topBarCopy {
+  margin: 8px 0 0;
+  max-width: 44rem;
+  color: var(--vlp-text-secondary);
+  font-size: 0.95rem;
 }
 
 .mobileHeader {
@@ -107,8 +156,9 @@
   gap: 12px;
   min-height: 52px;
   padding: 8px var(--page-px);
-  background: var(--vlp-surface);
+  background: color-mix(in srgb, var(--vlp-surface) 92%, white);
   border-bottom: 1px solid var(--vlp-border);
+  flex: 0 0 auto;
 }
 
 @media (min-width: 768px) {
@@ -118,13 +168,17 @@
 }
 
 .mobileTitle {
-  flex: 1;
-  text-align: center;
   font-family: var(--font-display);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mobileTitleWrap {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
 }
 
 .backButton {
@@ -148,7 +202,7 @@
   display: flex;
   height: var(--tabbar-h);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--vlp-surface);
+  background: color-mix(in srgb, var(--vlp-surface) 92%, white);
   border-top: 1px solid var(--vlp-border);
 }
 
@@ -168,7 +222,7 @@
   min-height: var(--touch-min);
   color: var(--vlp-text-secondary);
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .tabItem.active {
@@ -209,6 +263,7 @@
   max-width: 1200px;
   width: 100%;
   margin-inline: auto;
+  padding-bottom: 8px;
 }
 
 .readingWidth {

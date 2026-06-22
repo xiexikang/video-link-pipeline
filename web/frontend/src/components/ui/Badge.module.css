@@ -2,35 +2,41 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 5px 10px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  font-weight: 500;
+  border: 1px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .queued {
-  background: color-mix(in srgb, var(--vlp-accent) 15%, transparent);
-  color: var(--vlp-accent);
+  background: color-mix(in srgb, var(--vlp-warn) 15%, white);
+  border-color: color-mix(in srgb, var(--vlp-warn) 24%, var(--vlp-border));
+  color: var(--vlp-warn);
 }
 
 .running {
-  color: var(--vlp-accent);
-  background: transparent;
+  color: var(--vlp-accent-strong);
+  background: var(--vlp-accent-soft);
+  border-color: color-mix(in srgb, var(--vlp-accent) 26%, var(--vlp-border));
 }
 
 .succeeded {
-  background: color-mix(in srgb, var(--vlp-ok) 15%, transparent);
+  background: color-mix(in srgb, var(--vlp-ok) 14%, white);
+  border-color: color-mix(in srgb, var(--vlp-ok) 24%, var(--vlp-border));
   color: var(--vlp-ok);
 }
 
 .failed {
-  background: color-mix(in srgb, var(--vlp-fail) 15%, transparent);
+  background: color-mix(in srgb, var(--vlp-fail) 14%, white);
+  border-color: color-mix(in srgb, var(--vlp-fail) 24%, var(--vlp-border));
   color: var(--vlp-fail);
 }
 
 .idle {
-  background: color-mix(in srgb, var(--vlp-idle) 40%, transparent);
+  background: color-mix(in srgb, var(--vlp-panel) 68%, white);
+  border-color: var(--vlp-border);
   color: var(--vlp-text-secondary);
 }
 

@@ -52,9 +52,32 @@ export function Settings() {
   if (error) return <div className={styles.error}>诊断加载失败：{error}</div>;
   if (!data) return <div className={styles.previewPlaceholder}>加载环境诊断…</div>;
 
+  const passedCount = data.checks.filter((check) => check.ok).length;
+
   return (
     <section>
-      <p className={styles.hint}>确认本机 prerequisites 是否就绪。</p>
+      <div className={styles.heroPanel}>
+        <div>
+          <div className="caption">Environment</div>
+          <h2 className="display-lg" style={{ margin: "6px 0 0" }}>
+            先确认本机依赖正常，再跑实际任务
+          </h2>
+          <p className={styles.heroLead}>
+            这里主要检查 FFmpeg、Selenium、浏览器 Cookies 和输出目录。环境先稳定，后续任务就不容易在半路失败。
+          </p>
+        </div>
+        <div className={styles.heroMeta}>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{passedCount}</div>
+            <div className={styles.statLabel}>通过检查</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statValue}>{data.checks.length}</div>
+            <div className={styles.statLabel}>检查总数</div>
+          </div>
+        </div>
+      </div>
+      <p className={styles.hint}>优先处理 Fail 项，再回到任务页发起下载或转录。</p>
       <div className={styles.settingsGrid}>
         {(["FFmpeg", "Selenium", "Cookies", "Output"] as const).map((group) => {
           const checks = grouped[group] ?? [];
@@ -62,7 +85,7 @@ export function Settings() {
           return (
             <article key={group} className={styles.settingCard}>
               <div className={`${styles.statusLight} ${ok ? styles.pass : styles.fail}`}>
-                {ok ? "Pass" : "Fail"}
+                {ok ? "Ready" : "Needs attention"}
               </div>
               <h3 className={styles.settingTitle}>{group}</h3>
               {checks.length === 0 ? (
