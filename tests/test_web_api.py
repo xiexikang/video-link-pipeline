@@ -62,6 +62,29 @@ def test_preview_artifact(client: TestClient, tmp_path: Path) -> None:
     assert "Title" in payload["content"]
 
 
+def test_preview_artifact_supports_output_relative_manifest_paths(client: TestClient) -> None:
+    output_dir = get_output_dir()
+    job_dir = output_dir / "preview-job-output-relative"
+    job_dir.mkdir(parents=True)
+    (job_dir / "transcript.txt").write_text("hello transcript", encoding="utf-8")
+    manifest = {
+        "updated_at": "2026-06-10T12:00:00Z",
+        "input": {"url": None, "input_path": None},
+        "artifacts": {"transcript_txt": "preview-job-output-relative/transcript.txt"},
+        "execution": {},
+    }
+    (job_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    list_response = client.get("/api/jobs")
+    job_id = next(job["id"] for job in list_response.json()["jobs"] if job["job_dir"] == "preview-job-output-relative")
+    preview = client.get(f"/api/jobs/{job_id}/artifacts/transcript_txt")
+
+    assert preview.status_code == 200
+    payload = preview.json()
+    assert payload["kind"] == "text"
+    assert payload["content"] == "hello transcript"
+
+
 def test_list_and_get_job(client: TestClient, tmp_path: Path) -> None:
     output_dir = get_output_dir()
     job_dir = output_dir / "sample-job"

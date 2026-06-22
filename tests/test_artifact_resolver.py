@@ -36,6 +36,22 @@ def test_resolve_artifact_file(tmp_path: Path) -> None:
     assert file_path.read_text(encoding="utf-8") == "hello transcript"
 
 
+def test_resolve_artifact_file_supports_output_relative_manifest_paths(tmp_path: Path) -> None:
+    output_root, job_id = _setup_job(tmp_path)
+    manifest_path = output_root / "demo-job" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["transcript_txt"] = "demo-job/transcript.txt"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    resolved = resolve_artifact_file(output_root, job_id, "transcript_txt")
+
+    assert resolved is not None
+    file_path, kind = resolved
+    assert file_path.name == "transcript.txt"
+    assert kind == "text"
+    assert file_path.read_text(encoding="utf-8") == "hello transcript"
+
+
 def test_resolve_artifact_rejects_path_traversal(tmp_path: Path) -> None:
     output_root, job_id = _setup_job(tmp_path)
     outside = tmp_path / "secret.txt"

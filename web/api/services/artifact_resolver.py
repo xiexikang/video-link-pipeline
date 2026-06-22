@@ -44,15 +44,15 @@ def resolve_job_dir(output_root: Path, job_id: str) -> tuple[str, Path] | None:
     return None
 
 
-def _safe_child_path(job_dir: Path, relative_path: str) -> Path | None:
+def _safe_child_path(base_dir: Path, relative_path: str) -> Path | None:
     if not relative_path or relative_path.startswith(("/", "\\")):
         return None
     if ".." in Path(relative_path).parts:
         return None
 
-    candidate = (job_dir / relative_path).resolve()
+    candidate = (base_dir / relative_path).resolve()
     try:
-        candidate.relative_to(job_dir.resolve())
+        candidate.relative_to(base_dir.resolve())
     except ValueError:
         return None
     return candidate
@@ -82,7 +82,12 @@ def resolve_artifact_file(
     if not isinstance(raw_path, str) or not raw_path.strip():
         return None
 
-    file_path = _safe_child_path(job_dir, raw_path.replace("\\", "/"))
+    normalized_path = raw_path.replace("\\", "/")
+    file_path = _safe_child_path(job_dir, normalized_path)
+    if file_path is None or not file_path.exists() or not file_path.is_file():
+        # Backward compatibility: some manifests store paths relative to output_root
+        # instead of the current job directory.
+        file_path = _safe_child_path(output_root, normalized_path)
     if file_path is None or not file_path.exists() or not file_path.is_file():
         absolute_candidate = Path(raw_path)
         if absolute_candidate.is_file():
