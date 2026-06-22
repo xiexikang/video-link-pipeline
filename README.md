@@ -1,126 +1,44 @@
 # video-link-pipeline
 
-`video-link-pipeline` 是一个面向本地命令行的全流程工具集，用来完成视频下载、转录、摘要生成和字幕格式转换。
+`video-link-pipeline` 是一个本地视频处理工具集，用来把“视频链接 / 本地媒体”整理成一套可复用产物：
+
+- 下载视频、音频、字幕和元数据
+- 用 Whisper 生成转录文本和字幕
+- 用大模型生成摘要和关键词
+- 按任务目录持续写入 `manifest.json`
+
+它既可以作为 CLI 使用，也带有一个本地 Web 工作台，适合在本机持续跑下载、转录和摘要流程。
+
+英文说明见 [README.en.md](G:\www-xxk\video-link-pipeline\README.en.md)。
+
+## 适合什么场景
+
+- 想把 B 站、YouTube 等视频内容拉到本地继续整理
+- 想把视频快速转成 `transcript.txt`、`subtitle.srt`、`summary.md`
+- 想保留稳定的任务目录和机器可读状态文件
+- 想在本地页面里查看任务进度、日志和产物预览
 
 ## 当前能力
 
-- `vlp download <url>`：下载视频、音频、字幕，并标准化输出目录
-- `vlp download-subs <url>`：只下载字幕和元数据，默认抓取所有字幕语言，适合 B 站这类“字幕可拿但视频格式受限”的场景
-- `vlp transcribe <path>`：对视频或音频做 Whisper 转录，生成 `transcript.txt`、`subtitle_whisper.srt`、`subtitle_whisper.vtt`
-- `vlp summarize <transcript.txt>`：调用大模型生成 `summary.md` 和 `keywords.json`
-- `vlp convert-subtitle <file-or-dir>`：在 `srt` 和 `vtt` 之间转换
-- `vlp run <url>`：串联下载、转录、摘要，并持续更新 `manifest.json`
-- `vlp cookies-login <url>`：打开独立浏览器窗口完成登录，并导出可复用的 `cookies.txt`
-- `vlp doctor`：检查 Python、FFmpeg、Selenium extra、cookies 配置
+- `vlp download <url>`：下载媒体、字幕和元数据
+- `vlp download-subs <url>`：只下载字幕和元数据
+- `vlp transcribe <path>`：对本地视频或音频做转录
+- `vlp summarize <transcript.txt>`：生成摘要和关键词
+- `vlp convert-subtitle <file-or-dir>`：在 `srt` / `vtt` 之间转换
+- `vlp run <url>`：串联下载、转录、摘要
+- `vlp cookies-login <url>`：打开独立浏览器窗口完成登录并导出 `cookies.txt`
+- `vlp doctor`：检查 Python、FFmpeg、Selenium、cookies 等环境状态
 
-## 项目架构
+## 快速开始
 
-### 模块结构
-
-源码主目录为 `src/video_link_pipeline/`，按 CLI 编排层、服务层和基础设施分层组织：
-
-```text
-src/video_link_pipeline/
-├── cli.py              # 统一 CLI 编排层（Typer 命令入口）
-├── config.py           # 配置加载与合并
-├── manifest.py         # 任务状态契约（manifest.json）
-├── doctor.py           # 环境/配置诊断
-├── errors.py           # 统一错误类型
-├── download/           # 下载（yt-dlp + Selenium 回退）
-│   ├── service.py      # 下载主流程与 fallback 编排
-│   ├── selenium_fallback.py
-│   ├── diagnostics.py  # 共享诊断码与 warning 分类
-│   ├── cookies.py
-│   └── yt_dlp_backend.py
-├── transcribe/         # 转录（faster-whisper / openai-whisper）
-│   ├── service.py
-│   ├── faster_engine.py
-│   ├── openai_engine.py
-│   └── ffmpeg.py
-├── summarize/          # 摘要（Claude / OpenAI / Gemini）
-│   ├── service.py
-│   └── providers.py
-└── subtitles/          # 字幕格式转换
-    └── convert.py
-
-根目录 legacy 脚本（向后兼容，仍复用包内服务层）:
-  download_video.py · parallel_transcribe.py · generate_summary.py · convert_subtitle.py
-```
-
-各层职责如下：
-
-| 层级 | 主要模块 | 职责 |
-| --- | --- | --- |
-| CLI 编排 | `cli.py` | 解析命令、加载配置、调用服务层、写入 `manifest.json` |
-| 服务层 | `download/`、`transcribe/`、`summarize/`、`subtitles/` | 下载、转录、摘要、字幕转换等业务逻辑 |
-| 基础设施 | `config.py`、`manifest.py`、`doctor.py`、`errors.py` | 配置合并、任务状态、环境诊断、统一错误类型 |
-
-复杂度较高的模块主要是 `download/service.py`（下载主流程与 Selenium fallback）和 `cli.py`（命令编排与 manifest 增量写入）。推荐新用法统一走 `vlp` CLI；根目录 legacy 脚本仅作兼容入口。
-
-### 架构总结
-
-整体是一个本地命令行内容处理流水线：`cli.py` 作为编排枢纽，调用各服务模块完成下载、转录、摘要等步骤，并通过 `manifest.json` 持续记录任务状态。
-
-```mermaid
-flowchart TB
-    subgraph CLI["CLI 层 (cli.py)"]
-        run[run_command]
-        dl[download_command]
-        tr[transcribe_command]
-        sm[summarize_command]
-        doc[doctor_command]
-    end
-
-    subgraph Services["服务层"]
-        ED[execute_download]
-        TP[transcribe_path]
-        ST[summarize_transcript]
-        CV[convert_subtitle]
-    end
-
-    subgraph Infra["基础设施"]
-        CFG[load_config / ConfigBundle]
-        MF[Manifest / upsert_manifest]
-        ERR[VlpError 体系]
-    end
-
-    subgraph Backends["后端实现"]
-        YTDLP[yt-dlp]
-        SEL[Selenium fallback]
-        FF[ffmpeg]
-        WH[faster/openai whisper]
-        LLM[Claude/OpenAI/Gemini]
-    end
-
-    run --> ED --> YTDLP
-    ED --> SEL
-    run --> TP --> FF --> WH
-    run --> ST --> LLM
-    dl --> ED
-    tr --> TP
-    sm --> ST
-
-    CLI --> CFG
-    CLI --> MF
-    Services --> ERR
-```
-
-关键调用关系：
-
-- **`vlp run`**：`execute_download` → `transcribe_path` → `summarize_transcript`，各阶段通过 `upsert_manifest` 增量写入 `manifest.json`；若 job 目录已有 `transcript.txt` 或 `summary.md`，会先复用已有产物。
-- **下载链路**：主路径走 `yt-dlp`；失败后按 `should_attempt_selenium_fallback` 判断是否进入 Selenium 浏览器兜底，再携带浏览器上下文重试下载。
-- **转录链路**：`resolve_input_media` → `extract_audio_from_video`（ffmpeg）→ 选择 faster/openai whisper 引擎 → 生成 SRT/VTT。
-- **摘要链路**：`load_transcript` → 按配置选择 Claude / OpenAI / Gemini provider。
-- **配置入口**：所有 CLI 命令经 `_command_context` 调用 `load_config`，优先级为 CLI 参数 > 环境变量 / `.env` > `config.yaml` > 内置默认值。
-
-## 安装
+### 1. 安装
 
 要求：
 
 - Python 3.10+
-- Windows、Linux、macOS 均可，本项目当前优先照顾 Windows 使用体验
+- Windows、Linux、macOS
 
-推荐安装方式：
+推荐安装：
 
 ```bash
 git clone <repository_url>
@@ -128,269 +46,196 @@ cd video-link-pipeline
 pip install -e .
 ```
 
-如果需要 Selenium 兜底能力：
+如果你需要 Selenium 浏览器兜底：
 
 ```bash
 pip install -e .[selenium]
 ```
 
-如果需要开发依赖：
+如果你要参与开发：
 
 ```bash
 pip install -e .[dev]
 ```
 
-`vlp doctor` 现在会把部分常见下载诊断码和修复建议串起来，尤其是这些 Windows 常见问题：
-
-- `browser_cookie_locked`：浏览器 cookies 数据库被占用时，先完全关闭 Chrome / Edge / Firefox 再重试
-- `browser_driver_unavailable`：未安装 Selenium extra 或浏览器驱动不可用时，先执行 `pip install "video-link-pipeline[selenium]"`
-- `ffmpeg_unavailable`：系统没有可用 FFmpeg 时，安装系统 ffmpeg，或确保环境中保留 `imageio-ffmpeg`
-
-`vlp doctor` 当前会重点展示：
-
-- 分段的检查输出，例如 `runtime`、`download prerequisites`、`effective download config`、`config risks`、`common diagnostic guidance`
-- 一个 `known diagnostic codes` 段，只补充当前检查里未出现的常见诊断码，避免和 `common diagnostic guidance` 重复
-- FFmpeg 的最终选择来源和路径，例如系统 `ffmpeg` 或 `imageio-ffmpeg`
-- Selenium extra 是否完整可用
-- 当前有效的 `download.selenium` 模式，例如 `auto`、`on`、`off`
-- 当前有效的 `download.cookies_from_browser` 和 `download.cookie_file` 值
-- 一条紧凑的 effective download config 摘要，便于快速看清 `selenium`、浏览器 cookies 和 cookie 文件的最终组合
-- cookies 配置是浏览器提取还是文件路径
-- `download.selenium`、`cookies_from_browser`、`cookie_file` 的组合风险或冲突
-- 对常见 Windows 锁库、驱动缺失、FFmpeg 缺失问题的修复建议
-
-其中 `config risks` 段里的输出层级约定是：
-
-- `WARN`：已经存在明显冲突、无效配置或可能直接阻塞流程的问题
-- `INFO`：当前配置可运行，但属于“值得注意”的建议项，不表示硬错误
-
-一个精简的 `vlp doctor` 输出示例如下：
-
-```text
-[INFO] config source=config.yaml
-[INFO] output_dir=./output
-[INFO] summary provider=claude
-[INFO] runtime:
-[OK] python: Python 3.11.0
-[OK] python_env: python executable: C:\Python311\python.exe
-[INFO] download prerequisites:
-[WARN] ffmpeg: ffmpeg missing
-[INFO] hint: install ffmpeg and ensure it is available in PATH
-[OK] selenium: selenium extra is available: selenium=yes webdriver-manager=yes
-[INFO] effective download config:
-[OK] download_effective_summary: effective download config summary: selenium=off cookies_from_browser=none cookie_file=none
-[OK] download_selenium: effective download.selenium=off
-[INFO] config risks:
-[INFO] download_config: download selenium=off and no cookie source is configured
-[INFO] hint: sites that require login or anti-bot verification may fail without cookies or fallback
-[INFO] common diagnostic guidance:
-[INFO] - ffmpeg_unavailable: FFmpeg is unavailable and media merge or conversion may fail.
-[INFO] - ffmpeg_unavailable fix: install ffmpeg and ensure it is available in PATH
-[INFO] known diagnostic codes:
-[INFO] - primary_auth_required: Primary download requires login or account access.
-[WARN] doctor found items that may block some workflows
-```
-
-补充说明：
-
-- `common diagnostic guidance` 只展示当前检查里实际命中的诊断码及修复建议
-- `known diagnostic codes` 只补充当前未命中的常见码，避免和 guidance 重复
-- 同一个诊断码即使在多个检查项里重复出现，CLI 也只会打印一份 guidance/reference，便于阅读和后续统计
-
-安装完成后可以先检查命令是否可用：
+安装后先确认命令可用：
 
 ```bash
 vlp --help
 vlp doctor
 ```
 
-## 本地开发验证
+### 2. 跑一个最小流程
 
-如果你在本地参与开发，推荐优先在仓库内使用 `.venv` 虚拟环境，而不是直接污染全局 Python。
-
-Windows / PowerShell 下推荐命令：
-
-```powershell
-python -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install --upgrade pip
-& .\.venv\Scripts\python.exe -m pip install -e .[dev]
-```
-
-如果你当前机器上暂时不适合完整安装 `.[dev]`，也可以先安装“最小可用测试环境”：
-
-```powershell
-& .\.venv\Scripts\python.exe -m pip install pytest ruff build PyYAML python-dotenv typer requests yt-dlp imageio-ffmpeg anthropic openai tqdm
-& .\.venv\Scripts\python.exe -m pip install -e . --no-deps
-```
-
-后续命令也建议显式使用 `.venv` 里的解释器，例如：
-
-```powershell
-& .\.venv\Scripts\python.exe -m pytest -q
-& .\.venv\Scripts\python.exe -m ruff check .
-& .\.venv\Scripts\python.exe -m build
-```
-
-如果你已经激活了虚拟环境，再使用短命令也可以：
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m pytest -q
-```
-
-当前仓库已经在仓库内 `.venv` 环境下跑通过一轮全量测试基线：
-
-```powershell
-& .\.venv\Scripts\python.exe -m pytest -q
-```
-
-最近一次本地基线结果为 `109 passed`。后续如果继续修改 CLI、manifest、doctor 或 download fallback，推荐优先在这条命令上确认没有回归。
-
-如果你在本地参与开发，推荐直接安装 dev 依赖：
+只下载：
 
 ```bash
-pip install -e .[dev]
+vlp download "https://www.bilibili.com/video/BV..."
 ```
 
-推荐按下面这个顺序做本地验证：
-
-1. 先确认当前 Python 解释器是你预期的环境
+完整流程：
 
 ```bash
-python -c "import sys; print(sys.executable)"
+vlp run "https://www.bilibili.com/video/BV..." --do-transcribe --do-summary
 ```
 
-2. 先跑一组轻量检查，确认代码至少可以导入、编译、构建
+对本地文件转录：
 
 ```bash
-python -m pip check
-python -m compileall src tests
-python -m build
+vlp transcribe ./output/demo/video.mp4
 ```
 
-3. 再跑静态检查和测试
+对已有转录生成摘要：
 
 ```bash
-python -m ruff check .
-python -m pytest
+vlp summarize ./output/demo/transcript.txt --provider claude
 ```
 
-与当前 CI / 本地脚本对应的最小验证矩阵如下：
+## 常用命令
 
-| 检查项 | 推荐命令 | 目的 | 是否需要 `.[dev]` |
-| --- | --- | --- | --- |
-| 依赖一致性 | `python -m pip check` | 检查当前环境是否有依赖冲突 | 否 |
-| 语法/可导入性 | `python -m compileall src tests` | 提前发现语法错误和明显导入问题 | 否 |
-| 静态检查 | `python -m ruff check .` | 发现风格和部分低成本问题 | 是 |
-| 单元测试 | `python -m pytest` | 运行当前回归测试集 | 是 |
-| 构建验证 | `python -m build` | 验证 sdist / wheel 可正常构建 | 是 |
-| PowerShell 汇总脚本 | `./scripts/check.ps1` | 按仓库默认顺序执行本地检查 | 视是否跳过 `ruff` / `pytest` / `build` 而定 |
-
-如果你只想做一轮最快速的“轻量自检”，推荐先执行：
+### 下载
 
 ```bash
-python -m compileall src tests
+vlp download "https://..."
+vlp download "https://..." --audio-only
+vlp download "https://..." --sub-lang zh --sub-lang en
+vlp download "https://..." --cookies-from-browser chrome
+vlp download "https://..." --cookie-file ./cookies.txt
+vlp download "https://..." --selenium auto
+vlp download "https://..." --group-by-site
 ```
 
-或者在 Windows / PowerShell 下执行：
-
-```powershell
-./scripts/check.ps1 -SkipPipCheck -SkipRuff -SkipPytest -SkipBuild
-```
-
-如果你希望完全对齐当前 CI，执行：
+### 只下载字幕
 
 ```bash
-python -m pip check
-python -m compileall src tests
-python -m ruff check .
-python -m pytest
-python -m build
+vlp download-subs "https://www.bilibili.com/video/BV..."
 ```
 
-Windows / PowerShell 下也可以直接执行仓库脚本：
-
-```powershell
-./scripts/check.ps1
-```
-
-如果你只想跳过较重步骤，也可以：
-
-```powershell
-./scripts/check.ps1 -SkipPytest
-./scripts/check.ps1 -SkipBuild
-./scripts/check.ps1 -SkipPipCheck -SkipCompileAll -SkipRuff -SkipPytest -SkipBuild
-```
-
-如果当前环境还没安装 `pytest`，运行 `python -m pytest` 时会看到类似 `No module named pytest` 的报错。这时重新执行：
+### 转录
 
 ```bash
-pip install -e .[dev]
+vlp transcribe ./output/demo/video.mp4
+vlp transcribe ./output/demo --model small --language auto
+vlp transcribe ./output/demo/video.mp4 --engine faster --device cpu --compute-type int8
 ```
 
-如果你只想先跑某一小组测试，也可以：
+### 摘要
 
 ```bash
-python -m pytest tests/test_doctor.py
-python -m pytest tests/test_download_diagnostics.py
+vlp summarize ./output/demo/transcript.txt --provider claude
+vlp summarize ./output/demo/transcript.txt --provider deepseek --base-url https://api.deepseek.com --model deepseek-chat
 ```
 
-当前 CI 额外还会做两类轻量校验：
+### 字幕转换
 
-- `python -m pip check`：检查安装后的依赖约束是否冲突
-- `python -m build`：验证当前仓库仍然可以正常构建 sdist / wheel
-
-常见本地排查提示：
-
-- 如果 `python -m pytest` 报 `No module named pytest`，说明当前解释器还没装 `dev` 依赖，重新执行 `pip install -e .[dev]`
-- 如果 `python -m ruff check .` 报 `No module named ruff`，处理方式同上，重新安装 `dev` 依赖
-- 如果 `python -m build` 报 `No module named build`，说明当前环境不是最新的 `dev` 依赖，同样重新执行 `pip install -e .[dev]`
-- 如果 `python -m pip check` 报依赖冲突，优先确认你当前使用的是项目对应虚拟环境，再重新执行 `python -m pip install -e .[dev]`
-- Windows 下如果你切换过多个 Python 版本，建议先执行 `python -c "import sys; print(sys.executable)"`，确认当前命令落在预期解释器上
-- `scripts/check.ps1` 开头也会打印当前 `sys.executable`，便于快速确认脚本实际使用的是哪个 Python
-- 如果你只是想确认最近文档/测试改动没有引入语法问题，`python -m compileall src tests` 是当前成本最低的一步
-
-## Skill 同步
-
-如果你希望把仓库里的 Codex skill 一起维护并安装到全局可发现目录，当前仓库已经提供了一个同步脚本：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
+```bash
+vlp convert-subtitle ./subtitle.vtt --format srt
+vlp convert-subtitle ./subs --batch --format srt
 ```
 
-这个脚本默认会做三件事：
+### 环境检查
 
-- 把仓库内的 `skills/video-link-pipeline` 同步到全局目录 `~/.codex/skills/video-link-pipeline`
-- 如果设置了 `CODEX_HOME`，则优先同步到 `$CODEX_HOME/skills/video-link-pipeline`
-- 同步完成后自动运行 `quick_validate.py` 校验安装后的 skill
-
-当前推荐约定是：
-
-- 只编辑仓库内的 `skills/video-link-pipeline`
-- 改完后再运行 `scripts/sync-skill.ps1` 发布到全局目录
-- 如果你只想同步不校验，可以追加 `-SkipValidate`
-
-例如：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1
-powershell -ExecutionPolicy Bypass -File scripts\sync-skill.ps1 -SkipValidate
+```bash
+vlp doctor
+vlp doctor --config ./config.yaml
 ```
 
-这样可以避免“仓库版本”和“全局安装版本”长期漂移，后续测试 skill 时也能始终基于最新内容。
+## Cookies 与登录
+
+很多站点在下载时会依赖登录态。最省心的做法是先导出一个 `cookies.txt`，后续反复复用。
+
+```bash
+vlp cookies-login "https://www.bilibili.com" --cookie-file ./cookies.txt
+vlp download "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt
+vlp run "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt --do-summary
+```
+
+补充说明：
+
+- `--cookies-from-browser chrome` 直接读浏览器 cookies，最方便，但浏览器运行中可能锁库
+- Windows 下如果看到浏览器 cookies 复制失败，先彻底关闭 Chrome / Edge / Firefox 再重试
+- `cookies-login` 使用独立浏览器 profile，更适合长期复用登录态
+
+## Web 工作台
+
+仓库里带有本地 Web 前端，适合：
+
+- 新建任务
+- 查看任务看板
+- 查看阶段状态、日志和诊断信息
+- 预览 transcript / subtitle / media / summary 等产物
+
+前端代码在：
+
+- [web/frontend](G:\www-xxk\video-link-pipeline\web\frontend)
+- [web/api](G:\www-xxk\video-link-pipeline\web\api)
+
+如果你正在做本地开发，通常会把 CLI 产物写到 `output/`，再由 Web API 和前端读取这些任务目录。
+
+## 输出目录约定
+
+所有任务都写入 `output_dir` 下的单独 job 目录。典型结构如下：
+
+```text
+output/
+└─ BVxxxx-demo-title/
+   ├─ video.mp4
+   ├─ audio.m4a
+   ├─ subtitle.srt
+   ├─ subtitle.vtt
+   ├─ transcript.txt
+   ├─ subtitle_whisper.srt
+   ├─ subtitle_whisper.vtt
+   ├─ transcript.json
+   ├─ summary.md
+   ├─ keywords.json
+   └─ manifest.json
+```
+
+其中：
+
+- `transcript.txt`：纯文本转录
+- `subtitle_whisper.srt` / `subtitle_whisper.vtt`：Whisper 生成字幕
+- `summary.md`：摘要结果
+- `keywords.json`：关键词结果
+- `manifest.json`：稳定的机器可读任务状态
+
+如果开启 `group_output_by_site` 或命令行传入 `--group-by-site`，目录会先按站点归类：
+
+```text
+output/
+├─ bilibili/
+│  └─ BVxxxx-demo-title/
+└─ youtube/
+   └─ demo-title/
+```
+
+## `manifest.json` 是什么
+
+`manifest.json` 是这套工具最重要的状态文件。CLI 和 Web 都围绕它工作。
+
+它通常记录：
+
+- 输入来源
+- 当前命令
+- 已生成的产物路径
+- 下载 / 转录 / 摘要各阶段状态
+- 失败原因与部分诊断信息
+
+如果你要做自动化处理、任务扫描、Web 展示，优先依赖 `manifest.json`，不要靠猜目录结构。
 
 ## 配置
 
-默认配置文件是项目根目录下的 `config.yaml`。
+默认配置文件是项目根目录的 `config.yaml`。
 
-配置优先级：
+优先级：
 
 1. CLI 参数
 2. 环境变量和 `.env`
 3. `config.yaml`
 4. 内置默认值
 
-配置示例：
+一个精简配置示例：
 
 ```yaml
 output_dir: ./output
@@ -421,17 +266,6 @@ summary:
   base_url: null
   max_tokens: 4096
   temperature: 0.3
-
-api_keys:
-  claude: null
-  openai: null
-  gemini: null
-  deepseek: null
-  kimi: null
-  moonshot: null
-  minimax: null
-  glm: null
-  zhipu: null
 ```
 
 常用环境变量：
@@ -442,321 +276,78 @@ OPENAI_API_KEY=...
 GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=...
 VLP_OUTPUT_DIR=./output
-VLP_GROUP_OUTPUT_BY_SITE=false
 VLP_DOWNLOAD_COOKIES_FROM_BROWSER=chrome
 VLP_WHISPER_MODEL=small
 VLP_SUMMARY_PROVIDER=claude
 ```
 
-说明：
+## 项目结构
 
-- 旧配置 `summary.api_keys.*` 仍会被兼容读取，但会给出迁移 warning
-- `vlp doctor` 会提示当前 FFmpeg 来源和 Selenium/cookies 相关问题
-- `--selenium auto|on|off` 已接入 `download` 和 `run`
-- `group_output_by_site=true` 时，下载任务会按站点归类到子目录，例如 `output/bilibili/...`、`output/youtube/...`
-
-## 使用方式
-
-### 下载
-
-```bash
-# 常规下载视频/音频/字幕
-vlp download "https://www.bilibili.com/video/BV..."
-vlp download "https://..." --output-dir ./output --sub-lang zh --sub-lang en
-vlp download "https://..." --audio-only
-vlp download "https://..." --cookies-from-browser chrome
-vlp download "https://..." --cookie-file ./cookies.txt
-vlp download "https://..." --selenium auto
-vlp download "https://..." --group-by-site
-
-# 只下载字幕和元数据，适合 B 站这类字幕可拿但视频格式可能受限的站点
-vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
-vlp download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome --group-by-site
-
-# 如果你当前终端里的 `vlp` 还没更新到仓库最新代码，也可以直接在仓库里运行
-python -m video_link_pipeline download-subs "https://www.bilibili.com/video/BV..." --cookies-from-browser chrome
-```
-
-使用 `--cookies-from-browser chrome` 时请注意：
-
-- 这里的 `BV...` 只是示例占位符，实际运行时需要替换成真实视频链接
-- Chrome / Edge / Firefox 如果正在运行，浏览器 cookies 数据库可能被占用，导致命令行无法复制 cookies
-- Windows 下这个问题尤其常见；如果看到 `Could not copy Chrome cookie database`，先彻底关闭浏览器及其后台进程再重试
-- 如果你不想每次都关闭浏览器，可以先导出 `cookies.txt`，后续改用 `--cookie-file`
-
-更推荐的免关浏览器方案是使用独立登录窗口导出 cookie 文件：
-
-```bash
-# 打开一个独立 Chrome 窗口，登录完成后回到终端按回车
-vlp cookies-login "https://www.bilibili.com" --cookie-file ./cookies.txt
-
-# 后续下载直接复用 cookies.txt，不需要关闭日常浏览器
-vlp download "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt
-vlp run "https://www.bilibili.com/video/BV..." --cookie-file ./cookies.txt --do-summary
-```
-
-`cookies-login` 使用独立 Selenium Chrome profile，不会读取你日常浏览器正在锁定的 cookies 数据库。默认 profile 目录是 `temp/cookie-login-profile`，以后再次执行同一命令时通常会保留这个独立登录态，像一只专门负责拿钥匙的小浏览器。
-
-### 转录
-
-```bash
-vlp transcribe ./output/demo/video.mp4
-vlp transcribe ./output/demo --model small --language auto
-vlp transcribe ./output/demo/video.mp4 --engine faster --device cpu --compute-type int8
-```
-
-### 摘要
-
-```bash
-vlp summarize ./output/demo/transcript.txt --provider claude
-vlp summarize ./output/demo/transcript.txt --provider deepseek --base-url https://api.deepseek.com --model deepseek-chat
-```
-
-### 字幕转换
-
-```bash
-vlp convert-subtitle ./subtitle.vtt --format srt
-vlp convert-subtitle ./subs --batch --format srt
-```
-
-### 串联执行
-
-```bash
-vlp run "https://..."
-vlp run "https://..." --do-transcribe
-vlp run "https://..." --do-transcribe --do-summary
-```
-
-### 环境自检
-
-```bash
-vlp doctor
-vlp doctor --config ./config.yaml
-```
-
-## 输出约定
-
-`output_dir` 是输出根目录，每次任务会落到单独的 job 目录中。
-
-如果开启 `group_output_by_site` 或命令行传入 `--group-by-site`，下载输出会先按站点归类，再落到具体 job 目录，例如：
+核心源码在 [src/video_link_pipeline](G:\www-xxk\video-link-pipeline\src\video_link_pipeline)：
 
 ```text
-output/
-├─ bilibili/
-│  └─ BVxxxx-demo-title/
-├─ youtube/
-│  └─ demo-title/
-└─ douyin/
-   └─ demo-title/
+src/video_link_pipeline/
+├── cli.py
+├── config.py
+├── manifest.py
+├── doctor.py
+├── errors.py
+├── download/
+├── transcribe/
+├── summarize/
+└── subtitles/
 ```
 
-典型输出如下：
+可以简单理解为三层：
 
-```text
-output/
-└─ BVxxxx-demo-title/
-   ├─ video.mp4
-   ├─ audio.m4a
-   ├─ subtitle.vtt
-   ├─ subtitle.srt
-   ├─ transcript.txt
-   ├─ subtitle_whisper.srt
-   ├─ subtitle_whisper.vtt
-   ├─ transcript.json
-   ├─ summary.md
-   ├─ keywords.json
-   └─ manifest.json
+- CLI 编排层：命令入口和参数组织
+- 服务层：下载、转录、摘要、字幕转换
+- 基础设施：配置、错误、manifest、doctor
+
+兼容脚本仍然保留，但新用法建议统一走 `vlp`：
+
+- `download_video.py`
+- `parallel_transcribe.py`
+- `generate_summary.py`
+- `convert_subtitle.py`
+
+## 本地开发
+
+推荐使用仓库内虚拟环境：
+
+```powershell
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .[dev]
 ```
 
-其中 `manifest.json` 是稳定的机器可读输出，会在 `download`、`transcribe`、`summarize`、`run` 中持续补全。
+常用检查命令：
 
-当下载阶段触发 Selenium fallback 时，`manifest.json` 的 `execution.download` 里还会额外记录诊断字段：
-
-- `used_selenium_fallback`：是否走过浏览器兜底
-- `error_code`：下载失败分类，例如 `DOWNLOAD_PRIMARY_FAILED`、`DOWNLOAD_FALLBACK_PREPARE_FAILED`、`DOWNLOAD_FALLBACK_RETRY_FAILED`
-- `hint`：面向用户的可执行修复建议，优先复用 doctor/诊断码里的 remediation 文案
-- `fallback_status`：fallback 当前状态，例如 `triggered`、`dependency_missing`、`prepare_failed`、`retry_failed`、`succeeded`
-- `warnings`：触发 fallback 的原因、缺依赖提示、上下文准备说明
-- `warning_details`：结构化 warning 列表，包含 `code`、`message`、`stage`，便于批处理统计，例如 `primary_http_403`、`browser_cookie_locked`、`fallback_media_hint_missing_structured`
-- `fallback_context.resolved_url`：浏览器最终停留地址
-- `fallback_context.canonical_url`：页面 canonical 或等价主地址
-- `fallback_context.media_hint_url`：从页面线索中提取出的优先重试媒体地址
-- `fallback_context.site_name`：识别出的站点名称
-- `fallback_context.extraction_source`：媒体线索来源，例如 `next-data:playAddr`、`jsonld:contentUrl`、`window.__INITIAL_STATE__:playAddr`、`meta:itemprop:contentUrl`
-- `fallback_context.extraction_kind`：对 `extraction_source` 的稳定归类，例如 `meta`、`jsonld`、`next_data`、`window_state`、`inline_html`
-
-常见 `warning_details.code` 对照：
-
-- `primary_http_403`：主下载遇到 403/Forbidden，通常是反爬、鉴权或区域限制
-- `primary_captcha_required`：主下载命中验证码或人机校验
-- `primary_auth_required`：主下载需要登录或账号权限
-- `browser_cookie_locked`：浏览器 cookies 数据库被占用、锁定或无法复制
-- `browser_driver_unavailable`：Selenium 浏览器驱动不可用
-- `fallback_context_prepared`：fallback 已成功提取浏览器上下文
-- `fallback_media_hint_missing_page_only`：页面里几乎没有可用结构化线索，只能用页面地址重试
-- `fallback_media_hint_missing_inline_only`：只命中了 inline script / raw HTML 线索，但还没抽到明确媒体地址
-- `fallback_media_hint_missing_structured`：命中了 meta / JSON-LD / 页面状态等结构化线索，但仍未抽到明确媒体地址
-- `fallback_dependency_hint` / `fallback_prepare_hint` / `fallback_retry_hint`：fallback 各阶段的补充提示
-
-一个更接近当前 fallback 排查场景的下载诊断片段示例如下：
-
-```json
-{
-  "execution": {
-    "download": {
-      "success": false,
-      "used_selenium_fallback": false,
-      "fallback_status": "retry_failed",
-      "error_code": "DOWNLOAD_FALLBACK_RETRY_FAILED",
-      "error": "retry download failed",
-      "hint": "Structured cues such as meta, JSON-LD, or page state were present, but they still did not expose a direct media URL. This usually points to incomplete site-specific extraction logic.",
-      "warnings": [
-        "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-        "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
-        "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL"
-      ],
-      "warning_details": [
-        {
-          "code": "primary_http_403",
-          "stage": "primary_download",
-          "message": "primary download failed and triggered selenium fallback: HTTP Error 403: Forbidden",
-          "description": "Primary download hit 403/Forbidden, usually anti-bot, auth, or geo restriction."
-        },
-        {
-          "code": "fallback_context_prepared",
-          "stage": "fallback_prepare",
-          "message": "selenium fallback context prepared via window.__DATA__:playAddr (kind=window_state)",
-          "description": "Selenium fallback prepared a usable browser context."
-        },
-        {
-          "code": "fallback_media_hint_missing_structured",
-          "stage": "fallback_prepare",
-          "message": "selenium fallback did not extract an explicit media URL (kind=window_state) and will retry with the resolved page URL",
-          "description": "Structured page cues were detected, but they still did not expose an explicit media URL."
-        }
-      ],
-      "fallback_context": {
-        "resolved_url": "https://example.com/watch/demo",
-        "canonical_url": "https://example.com/watch/demo",
-        "media_hint_url": "https://example.com/watch/demo",
-        "site_name": "example.com",
-        "extraction_source": "window.__DATA__:playAddr",
-        "extraction_kind": "window_state"
-      }
-    }
-  }
-}
+```powershell
+& .\.venv\Scripts\python.exe -m pytest -q
+& .\.venv\Scripts\python.exe -m ruff check .
+& .\.venv\Scripts\python.exe -m build
 ```
 
-如果 fallback 已成功准备浏览器上下文，常见字段会变成：
+如果你只想先做一轮轻量检查：
 
-- `fallback_status = "prepared"` 或 `"succeeded"`
-- `warning_details.code` 里出现 `fallback_context_prepared`
-- `fallback_context.media_hint_url`、`fallback_context.extraction_source`、`fallback_context.extraction_kind` 可用于后续分析站点提取质量
+```powershell
+& .\.venv\Scripts\python.exe -m compileall src tests
+```
 
-CLI 在打印下载诊断时，也会尽量复用这套字段名，便于和 `manifest.json`、`vlp doctor` 对照：
+仓库里也提供了 PowerShell 检查脚本：
 
-- `download fallback_status=...`
-- `download error_code=...`
-- `download error_stage=...`
-- `download hint=...`
-- `download warning_code=<code> stage=<stage>: ...`
-- `download fallback_context.extraction_source=...`
-- `download fallback_context.extraction_kind=...`
-- `download fallback_context.media_hint_url=...`
-- `download fallback_context.canonical_url=...`
-- `download fallback_context.resolved_url=...`
+```powershell
+./scripts/check.ps1
+```
 
-这些 `warning_details.code` 与 `vlp doctor` 使用的是同一份共享诊断索引，当前统一维护在 `video_link_pipeline.download.diagnostics` 中，后续新增诊断码也应优先补这里，再同步消费方。
+## 相关目录
 
-可以把它们理解成一套共享诊断语言，不同出口的职责如下：
-
-- `manifest.json > execution.download.warning_details.code`：稳定的机器可读分类键，适合统计、批处理、告警聚合
-- `manifest.json > execution.download.hint`：当前失败路径下最应该优先展示给用户的修复建议
-- CLI `download warning_code=<code> stage=<stage>: ...`：面向终端排查时的即时输出，字段名尽量贴近 manifest
-- `vlp doctor` 的 `common diagnostic guidance`：针对“当前环境/配置已命中的诊断码”给出说明与 fix
-- `vlp doctor` 的 `known diagnostic codes`：补充常见但当前未命中的共享诊断码，作为参考索引
-
-常见诊断码对照建议如下：
-
-| 诊断码 | 典型出现位置 | 含义 | 建议动作 |
-| --- | --- | --- | --- |
-| `primary_http_403` | download manifest / download CLI / doctor 参考 | 主下载遇到 403，通常是反爬、鉴权或区域限制 | 先尝试 `--cookies-from-browser`，必要时打开 `--selenium auto/on` |
-| `primary_captcha_required` | download manifest / download CLI / doctor 参考 | 页面要求验证码或人机校验 | 先在浏览器里完成验证，再重试 cookies 或 fallback |
-| `primary_auth_required` | doctor 当前检查 / download manifest / doctor 参考 | 站点需要登录或账号权限 | 登录后使用浏览器 cookies 或 `cookies.txt` |
-| `browser_cookie_locked` | doctor 当前检查 / download manifest / doctor 参考 | 浏览器 cookies 库被占用、锁定或无法复制 | 完全关闭浏览器后重试，Windows 上尤其常见 |
-| `browser_driver_unavailable` | doctor 当前检查 / download manifest / doctor 参考 | Selenium extra 或浏览器驱动不可用 | 安装 `video-link-pipeline[selenium]`，确认 Chrome 可正常启动 |
-| `ffmpeg_unavailable` | doctor 当前检查 / doctor 参考 | FFmpeg 缺失，可能影响合并、转码、抽音频 | 安装系统 ffmpeg，或保留 `imageio-ffmpeg` |
-| `fallback_context_prepared` | download manifest / download CLI | 浏览器上下文已成功准备，可进入重试 | 重点查看 `fallback_context.*` 字段判断提取质量 |
-| `fallback_media_hint_missing_page_only` | download manifest / download CLI / doctor 参考 | 页面几乎没有结构化媒体线索，只能退回页面地址重试 | 优先补页面 cue 检测；当前先看 `resolved_url`/`canonical_url` |
-| `fallback_media_hint_missing_inline_only` | download manifest / download CLI / doctor 参考 | 只有 inline script / raw HTML 线索，没有抽到直接媒体地址 | 优先补更深的内联状态脚本解析 |
-| `fallback_media_hint_missing_structured` | download manifest / download CLI / doctor 参考 | 已命中结构化线索，但仍未抽到明确媒体地址 | 优先补站点特定状态字段提取逻辑 |
-| `fallback_dependency_hint` | download manifest / download CLI | fallback 依赖缺失时的补充提示 | 按 hint 安装依赖 |
-| `fallback_prepare_hint` | download manifest / download CLI | fallback 准备阶段失败时的补充提示 | 看浏览器启动、cookies 导出、页面线索提取链路 |
-| `fallback_retry_hint` | download manifest / download CLI | fallback 重试阶段失败时的补充提示 | 看 headers/cookies/media hint 是否正确 |
-
-如果你是在补站点适配，看到这几个 code 时，通常可以按下面的顺序排查：
-
-- `fallback_media_hint_missing_page_only`：先补页面级 cue 检测，例如更稳的 `video/source`、`og:*`、`twitter:*`、`canonical`、短视频页专用 DOM 标记。
-- `fallback_media_hint_missing_inline_only`：优先补 inline script / `JSON.parse(...)` / 无 `window.` 前缀状态赋值 / 特定站点脚本片段解析。
-- `fallback_media_hint_missing_structured`：说明已经命中了 `meta`、`JSON-LD`、`__NEXT_DATA__`、`window.__DATA__` 这类结构化入口，下一步应重点补字段映射，例如 `playAddr`、`dash.url`、`streamUrl`、`contentUrl`、`m3u8`。
-- 如果 `fallback_context.extraction_kind` 是 `window_state` 但仍是 `fallback_media_hint_missing_structured`，通常优先补状态对象里的字段遍历或嵌套路径覆盖。
-- 如果 `fallback_context.extraction_kind` 是 `inline_html` 或 `inline_script`，但没有升级到结构化 source，说明当前更多只是 URL 正则兜底，后续应尽量把它提升成稳定状态解析。
-
-当前下载实现内部也已经按阶段收口为三段，便于长期维护：
-
-- `primary path`：常规 `yt-dlp` 下载与产物标准化
-- `fallback prepare`：Selenium 浏览器上下文、cookies、重试线索提取
-- `fallback retry`：携带浏览器上下文重试 `yt-dlp` 并统一失败分类
-
-当前 `manifest.json` 的增量写入行为也已经按回归测试固定了几条约束：
-
-- `vlp download` 失败时，只要已经解析出 job 目录，仍会先写出 `manifest.json`，再由 CLI 抛错
-- `vlp transcribe` 失败时，只要已经产出转录目录与 `transcript.txt` 路径，仍会先写出 `manifest.json`，再由 CLI 抛错
-- `vlp summarize` 失败时，只要已经产出摘要目录与 `summary.md` 路径，仍会先写出 `manifest.json`，再由 CLI 抛错
-- `execution.download.error_code` 在下载失败但结果里未显式提供错误码时，会稳定回落成 `DOWNLOAD_FAILED`
-- `vlp run` 仅执行下载成功时，最终 `manifest.json` 会保留完整的 `execution.download` 诊断字段，不会凭空补出 `transcribe` 或 `summarize`
-- `vlp run` 如果发现 job 目录里已经存在 `transcript.txt`，会直接复用已有转录结果，并在 `execution.transcribe.reused_existing=true` 下记录这次跳过行为
-- `vlp run --do-summary` 如果发现 job 目录里已经存在 `summary.md`，会直接复用已有摘要结果，并在 `execution.summarize.reused_existing=true` 下记录这次跳过行为
-- `vlp run` 在转录失败时，manifest 会保留下载成功结果，并以最近一次写入命令 `vlp transcribe` 结束，方便定位失败阶段
-- `vlp run` 在摘要失败时，manifest 会同时保留下载成功、转录成功和摘要失败状态，并以最近一次写入命令 `vlp summarize` 结束
-
-当 `vlp run` 复用已有 transcript 时，常见补全字段包括：
-
-- `artifacts.transcript_txt`
-- `artifacts.subtitle_srt` / `artifacts.subtitle_vtt` / `artifacts.transcript_json`（如果这些文件已存在）
-- `execution.transcribe.success = true`
-- `execution.transcribe.reused_existing = true`
-- `execution.transcribe.warnings = ["reused existing transcript"]`
-
-当 `vlp run` 复用已有 summary 时，常见补全字段包括：
-
-- `artifacts.summary_md`
-- `artifacts.keywords_json`（如果该文件已存在）
-- `execution.summarize.success = true`
-- `execution.summarize.reused_existing = true`
-- `execution.summarize.warnings = ["reused existing summary"]`
-
-## 兼容脚本
-
-以下脚本仍然可用，但定位已经变成兼容层：
-
-- `python download_video.py ...`
-- `python parallel_transcribe.py ...`
-- `python generate_summary.py ...`
-- `python convert_subtitle.py ...`
-
-建议新用法统一迁移到 `vlp`。兼容脚本会继续复用包内实现，但不再作为长期主入口。
-
-## 已知状态
-
-- `M1a / M1b / M1c` 对应的基础包化、命令迁移、`manifest.json` 接入与文档对齐已经基本完成
-- `vlp run` 和 `vlp doctor` 已经落地，现有主流程可以通过统一 CLI 使用
-- 下载链路已补充结构化 diagnostics、warning 分类和典型修复建议，`doctor` 会同步展示常见问题说明
-- 已补充基础测试、Windows CI 与本地校验脚本 `scripts/check.ps1`
-- 当前环境下如果未安装 `pytest`、`ruff` 或 `build`，本地无法完成完整开发校验
-- Selenium fallback 目前已具备真实浏览器兜底与部分站点线索提取能力，但仍在持续稳定化
-- 下一阶段重点是补足更多回归测试、完善下载失败分类，并继续打磨 fallback 在复杂站点上的成功率
+- [src/video_link_pipeline](G:\www-xxk\video-link-pipeline\src\video_link_pipeline)：核心 Python 包
+- [tests](G:\www-xxk\video-link-pipeline\tests)：测试
+- [web](G:\www-xxk\video-link-pipeline\web)：本地 Web 工作台
+- [scripts](G:\www-xxk\video-link-pipeline\scripts)：开发辅助脚本
+- [skills/video-link-pipeline](G:\www-xxk\video-link-pipeline\skills\video-link-pipeline)：Codex skill
 
 ## License
 
