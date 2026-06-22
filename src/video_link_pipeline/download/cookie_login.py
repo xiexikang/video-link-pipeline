@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -15,6 +16,16 @@ class CookieLoginError(VlpError):
 
     def __init__(self, message: str, hint: str | None = None) -> None:
         super().__init__(message=message, error_code="COOKIE_ACCESS_FAILED", hint=hint)
+
+
+@dataclass(slots=True)
+class CookieLoginSession:
+    """A visible browser session waiting for the user to complete login."""
+
+    driver: object
+    url: str
+    cookie_file: Path
+    profile_dir: Path
 
 
 def _chrome_cookie_to_netscape(cookie: dict[str, Any]) -> dict[str, object]:
@@ -45,14 +56,7 @@ def _collect_browser_cookies(driver: object) -> list[dict[str, object]]:
     ]
 
 
-def export_cookies_after_login(
-    *,
-    url: str,
-    cookie_file: str | Path,
-    profile_dir: str | Path,
-    prompt: Callable[[str], None] | None = None,
-) -> Path:
-    """Open an isolated visible browser, wait for user login, then export cookies."""
+def _create_visible_chrome_driver(profile_dir: Path) -> object:
     if not selenium_extra_available():
         raise DependencyMissingError(
             "interactive cookie login requires optional Selenium dependencies",
@@ -64,38 +68,80 @@ def export_cookies_after_login(
     from selenium.webdriver.chrome.service import Service as ChromeService
     from webdriver_manager.chrome import ChromeDriverManager
 
-    output_path = Path(cookie_file)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    profile_path = Path(profile_dir)
-    profile_path.mkdir(parents=True, exist_ok=True)
+    profile_dir.mkdir(parents=True, exist_ok=True)
 
     options = Options()
-    options.add_argument(f"--user-data-dir={profile_path.resolve()}")
+    options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
     options.add_argument("--window-size=1280,900")
     options.add_argument("--lang=zh-CN")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
 
-    driver = webdriver.Chrome(
+    return webdriver.Chrome(
         service=ChromeService(ChromeDriverManager().install()),
         options=options,
     )
-    try:
-        driver.get(url)
-        if prompt is not None:
-            prompt(
-                "请在打开的浏览器窗口中完成登录/验证。完成后回到终端按回车导出 cookies..."
-            )
 
-        cookies = _collect_browser_cookies(driver)
+
+def open_cookie_login_session(
+    *,
+    url: str,
+    cookie_file: str | Path,
+    profile_dir: str | Path,
+) -> CookieLoginSession:
+    """Open an isolated visible browser and return the live login session."""
+    output_path = Path(cookie_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_path = Path(profile_dir)
+    driver = _create_visible_chrome_driver(profile_path)
+    try:
+        driver.get(url)  # type: ignore[attr-defined]
+    except Exception:
+        driver.quit()  # type: ignore[attr-defined]
+        raise
+    return CookieLoginSession(
+        driver=driver,
+        url=url,
+        cookie_file=output_path,
+        profile_dir=profile_path,
+    )
+
+
+def export_cookie_login_session(session: CookieLoginSession, *, close: bool = True) -> Path:
+    """Export cookies from a live login session."""
+    try:
+        cookies = _collect_browser_cookies(session.driver)
         if not cookies:
             raise CookieLoginError(
                 "no cookies were available after browser login",
-                hint="make sure you logged in on the opened page before pressing Enter",
+                hint="make sure you logged in on the opened page before exporting cookies",
             )
 
-        _write_netscape_cookies(output_path, cookies)
-        return output_path
+        _write_netscape_cookies(session.cookie_file, cookies)
+        return session.cookie_file
     finally:
-        driver.quit()
+        if close:
+            session.driver.quit()  # type: ignore[attr-defined]
+
+
+def close_cookie_login_session(session: CookieLoginSession) -> None:
+    """Close a live login browser session."""
+    session.driver.quit()  # type: ignore[attr-defined]
+
+
+def export_cookies_after_login(
+    *,
+    url: str,
+    cookie_file: str | Path,
+    profile_dir: str | Path,
+    prompt: Callable[[str], None] | None = None,
+) -> Path:
+    """Open an isolated visible browser, wait for user login, then export cookies."""
+    session = open_cookie_login_session(
+        url=url,
+        cookie_file=cookie_file,
+        profile_dir=profile_dir,
+    )
+    if prompt is not None:
+        prompt("请在打开的浏览器窗口中完成登录/验证。完成后回到终端按回车导出 cookies...")
+    return export_cookie_login_session(session, close=True)
