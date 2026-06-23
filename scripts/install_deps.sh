@@ -153,13 +153,13 @@ echo "2. 激活虚拟环境:"
 echo "   source venv/bin/activate"
 echo
 echo "3. 测试视频下载:"
-echo "   python download_video.py 'https://www.youtube.com/watch?v=xxxxx'"
+echo "   vlp download 'https://www.youtube.com/watch?v=xxxxx'"
 echo
 echo "4. 如需转录:"
-echo "   python parallel_transcribe.py --input output/xxx/video.mp4"
+echo "   vlp transcribe output/xxx/video.mp4"
 echo
 echo "5. 生成摘要:"
-echo "   python generate_summary.py --transcript output/xxx/transcript.txt"
+echo "   vlp summarize output/xxx/transcript.txt"
 echo
 echo "详细用法请参考 index.md"
 echo

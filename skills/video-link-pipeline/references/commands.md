@@ -157,7 +157,7 @@ Use these quick rules:
 
 ## Notes
 
-Prefer the unified `vlp` CLI over legacy wrapper scripts unless the user explicitly asks about backward compatibility.
+Use the unified `vlp` CLI. Do not recommend removed top-level wrapper scripts.
 
 When a job folder already exists, inspect its outputs and `manifest.json` before rerunning expensive work.
 

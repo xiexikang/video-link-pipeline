@@ -304,12 +304,7 @@ src/video_link_pipeline/
 - 服务层：下载、转录、摘要、字幕转换
 - 基础设施：配置、错误、manifest、doctor
 
-兼容脚本仍然保留，但新用法建议统一走 `vlp`：
-
-- `download_video.py`
-- `parallel_transcribe.py`
-- `generate_summary.py`
-- `convert_subtitle.py`
+旧的根目录脚本入口已经移除，对外命令统一使用 `vlp`。
 
 ## 本地开发
 

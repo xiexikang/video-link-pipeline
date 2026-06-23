@@ -10,7 +10,7 @@ The refactor has moved beyond the initial design stage and most v1 foundations a
 
 Current progress by milestone:
 
-- `M1a` is effectively complete: package metadata, `src/` layout, shared config/errors/logging/manifest modules, and compatibility wrappers are in place
+- `M1a` is effectively complete: package metadata, `src/` layout, and shared config/errors/logging/manifest modules are in place
 - `M1b` is effectively complete: `download`, `transcribe`, `summarize`, and `convert-subtitle` have been migrated behind the unified `vlp` CLI
 - `M1c` is effectively complete: `manifest.json` is written incrementally, job-directory normalization is implemented, and the docs have largely been realigned with the live config schema
 - `M2` is in progress but substantially delivered: `vlp doctor`, structured download diagnostics, warning classification, shared remediation guidance, baseline tests, Windows CI, and local dev-check scripts are already available
@@ -32,12 +32,7 @@ clear Windows diagnostics, and a low-risk migration path for existing users.
 
 ## Current State
 
-The current repository is centered on four standalone Python scripts:
-
-- `download_video.py`
-- `parallel_transcribe.py`
-- `generate_summary.py`
-- `convert_subtitle.py`
+The current repository is centered on the unified `vlp` CLI and the Python package under `src/`.
 
 The scripts are functional, but the project currently has these structural issues:
 
@@ -53,7 +48,7 @@ The scripts are functional, but the project currently has these structural issue
 ## Goals
 
 - Publish as a pip-installable package with the CLI command `vlp`
-- Preserve existing script entry points as compatibility wrappers
+- Consolidate all public command usage behind the `vlp` CLI
 - Introduce a unified configuration schema and deterministic precedence rules
 - Introduce `manifest.json` as the stable output contract
 - Improve Windows usability with `vlp doctor`
@@ -149,23 +144,7 @@ Normalize legacy naming where current scripts drift:
 - `--engine {auto,faster,openai}` for transcription engine selection
 - `convert-subtitle` instead of raw script naming
 
-Compatibility wrappers may still accept older names such as `--cookies` and map them internally.
-
-## Compatibility Strategy
-
-The current script filenames remain in the repository for v1:
-
-- `download_video.py`
-- `parallel_transcribe.py`
-- `generate_summary.py`
-- `convert_subtitle.py`
-
-Each wrapper will:
-
-- Parse the legacy arguments or a compatible subset
-- Translate them into the new package API or CLI
-- Emit a concise deprecation warning
-- Preserve the existing exit code behavior as much as practical
+The CLI should use normalized flag names directly. Deprecated aliases can be removed once docs and examples have been updated.
 
 Compatibility scope:
 
@@ -783,7 +762,7 @@ Recommended follow-up:
 - Add `pyproject.toml`
 - Add `src/` package layout
 - Introduce shared config, errors, logging, and manifest modules
-- Add compatibility wrappers
+- Finish consolidating command entrypoints behind `vlp`
 
 ### M1b: Command Migration
 
@@ -814,7 +793,6 @@ Recommended follow-up:
 
 - Whether `faster-whisper` should remain core or become an extra in a later version
 - Whether `--json` should be standardized across all commands in v1 or delayed
-- How aggressively wrappers should preserve legacy argument names versus emitting migration warnings
 - Whether job directory naming should prefer title-only, ID-only, or `id-title`
 
 ## Recommendation
@@ -824,7 +802,7 @@ Proceed with the refactor.
 The design is justified by the current repository state, but v1 should stay disciplined:
 
 - Keep `manifest.json` scoped to a job directory
-- Treat compatibility wrappers as a transition layer, not a permanent public API
+- Keep `vlp` as the single public CLI surface
 - Land step commands before a full `run` orchestration command
 - Fix config and dependency drift early so documentation, code, and packaging converge
 
@@ -988,26 +966,24 @@ Dependencies:
 - M1a-3
 - M1a-5
 
-#### M1a-7 Compatibility wrapper strategy
+#### M1a-7 CLI entrypoint consolidation
 
 Scope:
 
-- Convert top-level scripts into wrappers over package APIs or CLI dispatch
-- Preserve common legacy flags and exit behavior where practical
-- Emit concise deprecation warnings
+- Route all supported command usage through `vlp`
+- Remove redundant top-level script entrypoints
+- Update docs and helper scripts to use the unified CLI
 
 Deliverables:
 
-- Updated `download_video.py`
-- Updated `parallel_transcribe.py`
-- Updated `generate_summary.py`
-- Updated `convert_subtitle.py`
+- Updated package metadata and docs to reference `vlp`
+- Removed redundant top-level script entrypoints
 
 Acceptance criteria:
 
-- Existing script filenames still run
-- Common legacy commands still work or fail with actionable migration messaging
-- Wrapper logic is thin and does not duplicate business logic
+- Public command examples all use `vlp`
+- Repository no longer depends on duplicate top-level script entrypoints
+- Command guidance stays aligned with the package CLI
 
 Dependencies:
 
@@ -1028,7 +1004,7 @@ Deliverables:
 
 - New subtitles conversion module
 - `vlp convert-subtitle`
-- Wrapper delegation from `convert_subtitle.py`
+- Direct subtitle conversion support via `vlp convert-subtitle`
 
 Acceptance criteria:
 
@@ -1060,9 +1036,8 @@ Deliverables:
 
 Acceptance criteria:
 
-- `vlp download <url>` produces the same core artifacts as the legacy script
+- `vlp download <url>` produces the expected core artifacts
 - `--cookies-from-browser` and `--cookie-file` are supported explicitly
-- Legacy `--cookies` is accepted by the wrapper and mapped internally
 - Download result can be represented as structured data without scraping console output
 
 Dependencies:
@@ -1116,7 +1091,7 @@ Acceptance criteria:
 
 - File input and directory input both work
 - Video input triggers audio extraction before transcription
-- Engine normalization supports legacy wrapper names
+- Engine normalization supports the documented CLI names
 - Structured result contains transcript path, subtitle paths, detected language, and errors
 
 Dependencies:
@@ -1306,19 +1281,19 @@ Scope:
 
 - Update `README.md` and `README.en.md`
 - Replace script-first examples with `vlp` examples
-- Document compatibility wrappers and migration notes
+- Remove wrapper-era examples and align docs with `vlp`
 - Align config examples with the canonical schema
 
 Deliverables:
 
 - Updated README files
-- Migration notes for legacy script users
+- Updated usage notes for the unified CLI
 
 Acceptance criteria:
 
 - README command examples match actual CLI names and options
 - Config examples match the implemented schema
-- Legacy wrapper support and deprecation direction are documented clearly
+- Documentation reflects `vlp` as the only supported command surface
 
 Dependencies:
 

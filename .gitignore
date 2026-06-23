@@ -35,10 +35,12 @@ output
 __pycache__/
 *.py[cod]
 *.pyo
+.env
 .venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+*.egg-info/
 
 # Local runtime artifacts
 cookies*.txt
@@ -49,4 +51,5 @@ temp/*.mp4
 temp/*.webm
 
 # Frontend incremental build cache
+web/frontend/.vite/
 web/frontend/*.tsbuildinfo

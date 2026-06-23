@@ -19,13 +19,13 @@ For each case, check:
 - whether the skill is clearly being used
 - whether the recommended command is correct
 - whether the answer aligns with this repository's current CLI and manifest model
-- whether the answer avoids falling back to outdated wrapper scripts unless explicitly asked
+- whether the answer avoids falling back to removed wrapper scripts
 
 ## Acceptance Signals
 
 Treat these as positive signals:
 
-- recommends `vlp` subcommands instead of legacy wrappers
+- recommends `vlp` subcommands as the only supported CLI surface
 - chooses the smallest command that matches the goal
 - treats `manifest.json` as the primary job-state source
 - treats `vlp doctor` as the first-class environment and diagnostics entry point
@@ -201,7 +201,7 @@ Expected behavior:
 
 - recommends `vlp summarize`
 - does not default to `generate_summary.py`
-- may mention wrappers only as compatibility paths
+- does not describe removed wrappers as supported paths
 
 ## Stretch Cases
 

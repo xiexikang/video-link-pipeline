@@ -304,12 +304,7 @@ At a high level:
 - service layer: download, transcription, summary, subtitle conversion
 - infrastructure layer: config, errors, manifest, doctor
 
-Compatibility scripts are still present, but new usage should prefer `vlp`:
-
-- `download_video.py`
-- `parallel_transcribe.py`
-- `generate_summary.py`
-- `convert_subtitle.py`
+The old top-level script entrypoints have been removed. Use `vlp` as the public CLI.
 
 ## Local Development
 

@@ -9,7 +9,7 @@ Use this skill when working inside the `video-link-pipeline` repository.
 
 Treat this project as a local content-processing pipeline, not only as a downloader. The main goal is to turn video links or local media into reusable outputs such as subtitles, transcripts, summaries, keywords, and machine-readable job state.
 
-Prefer the unified `vlp` CLI over legacy wrapper scripts unless the user explicitly asks about backward compatibility.
+Use the unified `vlp` CLI. Do not suggest removed top-level wrapper scripts.
 
 ## Default Approach
 
