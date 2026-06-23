@@ -119,8 +119,10 @@ vlp summarize "<transcript.txt>"
 Prefer:
 
 ```bash
-vlp run "<url>" --do-summary
+vlp run "<url>" --do-transcribe --do-summary
 ```
+
+If the user only asks for a summary but no transcript exists yet, `vlp run "<url>" --do-summary` may still work because the pipeline will generate a transcript first when needed. For skill guidance, prefer the explicit form above because it better communicates intent.
 
 ### Pattern: diagnose before retry
 
@@ -158,3 +160,5 @@ Use these quick rules:
 Prefer the unified `vlp` CLI over legacy wrapper scripts unless the user explicitly asks about backward compatibility.
 
 When a job folder already exists, inspect its outputs and `manifest.json` before rerunning expensive work.
+
+When the local Web workspace is available, it can help confirm the same job state, logs, and artifacts, but `manifest.json` should still remain the primary contract.

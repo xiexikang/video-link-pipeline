@@ -36,6 +36,7 @@ Use these rules first:
 - Read the job directory before making assumptions about missing steps.
 - Check whether the user needs video files, subtitles only, transcript only, or transcript plus summary.
 - Keep command choice aligned with the user's real goal: content extraction, not download for its own sake.
+- When the repository's local Web workspace is in use, treat it as another view over the same `manifest.json` and job folders rather than a separate source of truth.
 
 ## Output Model
 
